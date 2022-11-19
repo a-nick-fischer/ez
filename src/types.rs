@@ -24,20 +24,24 @@ impl Type {
                     .map(|(a, b)| a.unify(b))
                     .collect(),
             
-            (Variable(vname, content), other) | (other, Variable(vname, content)) =>
-                if let Some(inner) = content.borrow().clone() {
-                    inner.unify(other)
+            (Variable(vname, content), other) | (other, Variable(vname, content)) => {
+                {
+                    if let Some(inner) = content.borrow().as_ref() {
+                        return inner.unify(other)
+                    }
                 }
-                else if self == other {
+                
+                if self == other {
                     Ok(())
                 }
                 else if other.occurs(vname) {
                     Err(format!("Type {other} contains typevar {vname}"))
                 }
                 else {
-                    Type::set_value(content.clone(), other.clone());
+                    content.replace(Some(other.clone()));
                     Ok(())
-                },
+                }
+            }
  
             (_, _) => Err(format!("Type Mismatch: {self} and {other}"))
         }
@@ -53,7 +57,7 @@ impl Type {
                         .map(|typ| typ.refresh_vars(env))
                         .collect()),
 
-            Variable(name, content) => env.new_var(name.clone(), content.clone()),
+            Variable(name, content) => env.new_var(name.clone(), content.borrow().clone()),
         }
     }
 
@@ -65,12 +69,44 @@ impl Type {
                 types.into_iter().any(|t| t.occurs(var)),
             
             Variable(name, content) => 
-                var == name || content.borrow().clone().map_or(false, |inner| inner.occurs(var))
+                var == name || content.borrow().as_ref().map_or(false, |inner| inner.occurs(var))
         }
     }
 
-    fn set_value(content: VarContent, value: Type) {
-        content.replace(Some(value));
+    fn concretize(&self) -> Type {
+        use Type::*;
+    
+        match self {
+            Kind(name, types) => 
+                Kind(name.clone(), types
+                    .into_iter()
+                    .map(|typ| typ.concretize())
+                    .collect()),
+            
+            Variable(_, content) => {
+                match content.borrow().as_ref() {
+                    Some(inner) => inner.concretize(),
+
+                    None => panic!("Invalid function signature applied")
+                }
+            }
+        }
+    }
+
+    fn deep_clone(&self) -> Type {
+        use Type::*;
+    
+        match self {
+            Kind(name, types) => 
+                Kind(name.clone(), types
+                    .into_iter()
+                    .map(|typ| typ.deep_clone())
+                    .collect()),
+            
+            Variable(name, content) => 
+                Variable(name.clone(), Rc::new(RefCell::new(
+                        content.borrow().as_ref().cloned())))
+        }
     }
 }
 
@@ -133,10 +169,44 @@ impl Signature {
             self.arguments[i].unify(stack_args)?;
         }
 
-        tenv.stack.extend(self.results.clone());
+        let concrete: Vec<Type> = self.results
+            .clone()
+            .into_iter()
+            .map(|typ| typ.concretize())
+            .collect();
+
+        tenv.stack.extend(concrete);
 
         Ok(tenv)
-    }   
+    }
+
+    fn deep_clone_self(&self) -> Self {
+        let deep_copy = |list: &Vec<Type>| list.into_iter()
+            .map(|typ| typ.deep_clone())
+            .collect();
+
+        let a = deep_copy(&self.arguments);
+        let b = deep_copy(&self.results);
+
+        combine_variables(a, b);
+
+        Signature { arguments: a, results: b }
+    }
+}
+
+fn combine_variables(a: &mut Vec<Type>, b: &mut Vec<Type>) {
+    let mut map: HashMap<String, VarContent> = HashMap::new();
+
+    for i in 0..a.len() {
+        if let Type::Variable(name, content) = a[i] {
+            if let Some(val) = map.get(&name) { 
+                content = val.clone();
+            }
+            else { 
+                map.insert(name, content);
+            }
+        }
+    }
 }
 
 fn sig_elems_to_type(elems: Vec<SignatureElement>, vars: &mut HashMap<String, VarContent>) -> Vec<Type> {
@@ -156,7 +226,9 @@ fn sig_elems_to_type(elems: Vec<SignatureElement>, vars: &mut HashMap<String, Va
                 Type::Variable(name, content.clone())
             }
             else {
-                Type::Variable(name, Rc::new(RefCell::new(None)))
+                let content = Rc::new(RefCell::new(None));
+                vars.insert(name.clone(), content.clone());
+                Type::Variable(name, content)
             }
         },
     };
@@ -168,17 +240,12 @@ fn sig_elems_to_type(elems: Vec<SignatureElement>, vars: &mut HashMap<String, Va
 
 impl Display for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let args = self.arguments.iter()
+        let conv = |list: &Vec<Type>| list.iter()
             .map(|arg| arg.to_string())
             .collect::<Vec<String>>()
             .join(" ");
         
-        let results = self.results.iter()
-            .map(|arg| arg.to_string())
-            .collect::<Vec<String>>()
-            .join(" ");
-        
-        write!(f, "{args} -> {results}")
+        write!(f, "{} -> {}", conv(&self.arguments), conv(&self.results))
     }
 }
 
@@ -221,11 +288,11 @@ impl TypeEnv {
         env
     }
 
-    pub fn new_var(&mut self, name: String, val: VarContent) -> Type {
+    pub fn new_var(&mut self, name: String, val: Option<Type>) -> Type {
         let name = format!("{name}{}", self.var_counter);
         self.var_counter += 1;
 
-        Type::Variable(name, val)
+        Type::Variable(name, Rc::new(RefCell::new(val)))
     }
 }
 

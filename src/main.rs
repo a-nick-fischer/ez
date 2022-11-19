@@ -1,3 +1,5 @@
+use types::Signature;
+
 mod lexer;
 mod error;
 mod types;

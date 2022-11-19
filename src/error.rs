@@ -4,16 +4,14 @@ use chumsky::prelude::*;
 use yansi::Paint;
 
 use std::ops::Range;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 
 pub type TErr = Vec<Simple<char>>;
-
-pub type TResult<T> = Result<T, TErr>;
 
 #[derive(Debug, Clone)]
 pub struct Spaned<T: Debug + Clone + PartialEq>(T, Range<usize>);
 
-pub fn adhoc_error<M: ToString, T>(msg: M) -> TResult<T> {
+pub fn adhoc_error<M: ToString, T>(msg: M) -> Result<T, TErr> {
     Err(vec![ Simple::custom(
         0..1, 
         msg
@@ -33,7 +31,7 @@ impl<T: Debug + Clone + PartialEq> Spaned<T> {
         &self.1
     }
 
-    pub fn err_with<M: ToString>(&self, msg: M) -> TResult<Spaned<T>> {
+    pub fn err_with<M: ToString>(&self, msg: M) -> Result<Spaned<T>, TErr> {
         Err(vec![ Simple::custom(
             self.range().clone(),
             msg

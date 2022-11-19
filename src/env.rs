@@ -40,14 +40,14 @@ pub type Action<'a> = Arc<dyn EnvAction<'a> + Send + Sync>;
 pub trait EnvAction<'a>: Debug {
     fn act(&self, env: &'a mut Env<'a>);
 
-    fn signature(&self, tenv: &TypeEnv) -> Signature;
+    fn signature(&self, tenv: &TypeEnv) -> Result<Signature, String>;
 }
 
 
 impl<'a> EnvAction<'a> for Spaned<Token> {
     fn act(&self, env: &'a mut Env<'a>) {
         match self.content() {
-            Token::Number(_) | Token::Quote(_) => env.push_val(self.clone()),
+            Token::Number(_) | Token::String(_) => env.push_val(self.clone()),
             
             Token::Ident(ident) => env.get_var(&ident).act(env),
 
@@ -55,28 +55,18 @@ impl<'a> EnvAction<'a> for Spaned<Token> {
         }
     }
 
-    fn signature(&self, tenv: &TypeEnv) -> Signature {
+    fn signature(&self, tenv: &TypeEnv) -> Result<Signature, String> {
         match self.content() {
-            Token::Number(a) => Signature(
-                vec![
-                    var("S")
-                ],
-                vec![
-                    var("S"), number_lit_span(*a, self.range().clone().unwrap())
-                ]
-            ),
+            Token::Number(_) => Ok(Signature::new("() -> (num)")),
 
-            Token::Quote(a) => Signature(
-                vec![
-                    var("S")
-                ],
-                vec![
-                    var("S"), quote_lit_span(a, self.range().clone().unwrap())
-                ]
-            ),
+            Token::String(_) => Ok(Signature::new("() -> (str)")),
+
+            Token::List(_) => todo!(),
+
+            Token::Function(_, _) => todo!(),
             
             Token::Ident(ident) => 
-                tenv.bindings.get(ident).unwrap().signature(tenv),
+                tenv.bindings.get(ident).ok_or(format!("{ident} not found")).cloned(),
 
             _ => unreachable!()
         }

@@ -1,5 +1,3 @@
-use std::fmt::{self, write};
-
 use chumsky::prelude::*;
 
 use crate::{error::{Spaned, TErr}};
@@ -36,6 +34,54 @@ impl fmt::Display for Token {
     }
 }*/
 
+fn ident_lexer() -> impl Parser<char, String, Error = Simple<char>> + Clone {
+    let punctuation = filter(|c: &char| {
+        c.is_ascii_punctuation() && !['[', ']', '{', '}', '(', ')', '"', '\'', '$'].contains(c)
+    });
+
+    filter(|c: &char| c.is_alphabetic())
+            .or(punctuation)
+            .chain(
+                filter(|c: &char| c.is_alphanumeric())
+                    .or(punctuation)
+                    .repeated(),
+            )
+            .collect::<String>()
+}
+
+fn sig_lexer() -> impl Parser<char, SignatureElement, Error = Simple<char>> + Clone {
+    recursive(|func|{
+        let var = just('\'')
+            .ignore_then(ident_lexer())
+            .map(|name| SignatureElement::Variable(name));
+
+        let polytype = func.delimited_by(just('['), just(']'));
+        
+        let kind = ident_lexer()
+            .then(polytype.repeated())
+            .map(|(name, typs)| SignatureElement::Kind(name, typs));
+
+        let elem = var.clone().or(kind.clone());
+
+        let elem_list = elem
+            .padded()
+            .repeated()
+            .delimited_by(just('('), just(')'));
+
+        let function_sig =
+            elem_list
+            .clone()
+            .padded()
+            .then_ignore(just("->"))
+            .padded()
+            .then(elem_list)
+            .map(|(a, b)| SignatureElement::Function(a, b));
+    
+        choice((function_sig, var, kind))
+    })
+}
+
+
 fn lexer() -> impl Parser<char, Vec<Spaned<Token>>, Error = Simple<char>> {
     let pad = one_of(" \t").repeated();
 
@@ -48,20 +94,7 @@ fn lexer() -> impl Parser<char, Vec<Spaned<Token>>, Error = Simple<char>> {
             .labelled("number")
             .map_with_span(|str, span| Spaned::new(Token::Number(str.parse().unwrap()), span));
 
-        let punctuation = filter(|c: &char| {
-            c.is_ascii_punctuation() && !['[', ']', '{', '}', '(', ')', '"', '\'', '$'].contains(c)
-        });
-
-        let ident_raw = filter(|c: &char| c.is_alphabetic())
-            .or(punctuation)
-            .chain(
-                filter(|c: &char| c.is_alphanumeric())
-                    .or(punctuation)
-                    .repeated(),
-            )
-            .collect::<String>();
-
-        let ident = ident_raw
+        let ident = ident_lexer()
             .labelled("identifier")
             .map_with_span(|str, span| Spaned::new(Token::Ident(str), span));
 
@@ -93,44 +126,13 @@ fn lexer() -> impl Parser<char, Vec<Spaned<Token>>, Error = Simple<char>> {
                 ),
                 span));
 
-
-        let function_signature = recursive(|func|{
-            let var = just('\'')
-                .ignore_then(ident_raw)
-                .map(|name| SignatureElement::Variable(name));
-
-            let polytype = func.delimited_by(just('['), just(']'));
-            
-            let kind = ident_raw
-                .then(polytype.repeated())
-                .map(|(name, typs)| SignatureElement::Kind(name, typs));
-
-            let elem = var.or(kind.clone());
-
-            let elem_list = elem
-                .padded()
-                .repeated()
-                .delimited_by(just('('), just(')'));
-
-            let function_sig =
-                elem_list
-                .clone()
-                .padded()
-                .then_ignore(just("->"))
-                .padded()
-                .then(elem_list)
-                .map(|(a, b)| SignatureElement::Function(a, b));
-        
-            choice((function_sig, var, kind))
-        });
-
         let function_body = rec
             .clone()
             .padded()
             .repeated()
             .delimited_by(just('{'), just('}'));
 
-        let function = function_signature
+        let function = sig_lexer()
             .padded()
             .then(function_body)
             .map_with_span(|(sig, body), span| {
@@ -166,6 +168,18 @@ fn preprocess_tokens(tokens: Vec<Spaned<Token>>) -> Vec<Spaned<Token>> {
         .map(|vec| vec.into_iter().rev().cloned().collect::<Vec<Spaned<Token>>>())
         .flatten()
         .collect()
+}
+
+pub fn lex_sig(src: &str) -> Result<SignatureElement, TErr> {
+    let (result, errs) = sig_lexer().parse_recovery_verbose(src.to_string());
+
+    match result {
+        Some(SignatureElement::Function(_, _)) => Ok(result.unwrap()),
+
+        Some(_) => panic!("Not a function"), // Change to error later
+
+        None => Err(errs)
+    }
 }
 
 pub fn lex(src: &str) -> Result<Vec<Spaned<Token>>, TErr> {

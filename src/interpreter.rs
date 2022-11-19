@@ -3,13 +3,13 @@ use crate::error::report_errors;
 use crate::lexer::lex;
 use crate::types::*;
 
-pub struct Interpreter<'a, 'b> {
-    tenv: TypeEnv<'a>,
+pub struct Interpreter<'b> {
+    tenv: TypeEnv,
     env: Env<'b>
 }
 
-impl<'a, 'b> Interpreter<'a, 'b> {
-    pub fn new(binding: &'a Bindings<'a>) -> Self {
+impl<'b> Interpreter<'b> {
+    pub fn new(binding: &Bindings) -> Self {
         Interpreter { 
             tenv: TypeEnv::new(&binding),
             env: Env::new()
@@ -18,12 +18,13 @@ impl<'a, 'b> Interpreter<'a, 'b> {
 
     pub fn run(&mut self, src: String){
         let result  = lex(&src)
-            .and_then(|tokens| typecheck(tokens, &self.tenv));
+            .and_then(|tokens| typecheck(tokens, self.tenv.clone()));
 
         match result {
             Ok(types) => {
-                println!("{types:?}");
-                self.tenv = types;
+                if let Some(node) = types.last() {
+                    self.tenv = node.type_env.clone();
+                }
             },
 
             Err(errs) => report_errors(&src, errs)

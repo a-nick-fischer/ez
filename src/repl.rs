@@ -32,7 +32,7 @@ pub fn repl() {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
-                //interpreter.run(line);
+                interpreter.run(line);
             },
 
             Err(ReadlineError::Interrupted) => {

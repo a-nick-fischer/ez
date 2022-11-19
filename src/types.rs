@@ -1,55 +1,59 @@
-use crate::{error::{Spaned, TResult}, lexer::Token};
+use crate::{error::{Spaned, TErr}, lexer::{Token, self, SignatureElement}, env::{EnvAction, Bindings}};
 
-use std::fmt::{Display, Formatter};
+use std::{fmt::{Display, Formatter}, rc::Rc, cell::RefCell, collections::HashMap};
+
+
+type VarContent = Rc<RefCell<Option<Type>>>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Type {
     Kind(String, Vec<Type>),
-    Variable(String, Option<Box<Type>>)
+    Variable(String, VarContent)
 }
 
 impl Type {
-    fn unify(&self, other: &Self) -> Result<Self, String> {
+    fn unify<'a>(&'a self, other: &'a Self) -> Result<(), String> {
         use Type::*;
 
         match (self, other) {
-            (Kind(a, types_a), Kind(b, types_b)) if a == b && types_a == types_b => 
-                Ok(self.clone()),
+            // Unify types
+            (Kind(a, types_a), Kind(b, types_b)) if a == b && types_a.len() == types_b.len() =>
+                types_a
+                    .into_iter()
+                    .zip(types_b)
+                    .map(|(a, b)| a.unify(b))
+                    .collect(),
             
-            (Variable(a, _), Variable(b, _)) if a == b =>
-                Ok(self.clone()),
-            
-            (Variable(a, None), Variable(b, content_b)) | (Variable(b, content_b), Variable(a, None)) =>
-                Ok(Type::gen_equal_variables(a, b, content_b.clone().map(|t| *t))),
-
-            (Variable(a, Some(content_a)), Variable(b, Some(content_b))) =>
-                content_a.unify(content_b)
-                    .map(|content_c| Type::gen_equal_variables(a, b, Some(content_c.clone()))),
-
-            (Variable(a, None), other) | (Variable(a, None), other) if !other.occurs(a) =>
-                Ok(Variable(a.clone(), Some(Box::new(other.clone())))),
+            (Variable(vname, content), other) | (other, Variable(vname, content)) =>
+                if let Some(inner) = content.borrow().clone() {
+                    inner.unify(other)
+                }
+                else if self == other {
+                    Ok(())
+                }
+                else if other.occurs(vname) {
+                    Err(format!("Type {other} contains typevar {vname}"))
+                }
+                else {
+                    Type::set_value(content.clone(), other.clone());
+                    Ok(())
+                },
  
-            (a, b) => Err(format!("Type Mismatch: {} and {}", self, other))
+            (_, _) => Err(format!("Type Mismatch: {self} and {other}"))
         }
     }
 
-    fn refresh_vars(&self, env: &TypeEnv) -> (Type, TypeEnv) {
+    fn refresh_vars(&self, env: &mut TypeEnv) -> Type {
         use Type::*;
 
         match self {
-            Kind(a, types) => {
-                let mut buffer = vec![];
-                let last = env.clone();
+            Kind(a, types) =>
+                Kind(a.clone(), types
+                        .into_iter()
+                        .map(|typ| typ.refresh_vars(env))
+                        .collect()),
 
-                for typ in types {
-                    let (newt, last) = typ.refresh_vars(env);
-                    buffer.push(newt);
-                }
-
-                (Kind(a.clone(), buffer), last)
-            },
-
-            Variable(_, content) => env.new_var(content.clone()),
+            Variable(name, content) => env.new_var(name.clone(), content.clone()),
         }
     }
 
@@ -60,40 +64,13 @@ impl Type {
             Kind(_, types) => 
                 types.into_iter().any(|t| t.occurs(var)),
             
-            Variable(name, _) if var == name => 
-                true,
-            
-            Variable(_, Some(t)) => 
-                t.occurs(var),
-
-            _ => false
+            Variable(name, content) => 
+                var == name || content.borrow().clone().map_or(false, |inner| inner.occurs(var))
         }
     }
 
-    fn bind_in(name: String, value: Option<Box<Type>>, list: Vec<Type>) -> Vec<Type> {
-        use Type::*;
-
-        let mut buffer = vec![];
-
-        for elem in list {
-            let res = match elem {
-                Kind(a, types) => Kind(a, Type::bind_in(name, value, types)),
-
-                Variable(a, _) if name == a => Variable(name, value),
-
-                _ => elem
-            };
-
-            buffer.push(res);
-        }
-
-        buffer
-    }
-
-    fn gen_equal_variables(a: &String, b: &String, content: Option<Type>) -> Type {
-        use Type::*;
-
-        Variable(b.clone(), Some(Box::new(Variable(a.clone(), content.map(Box::new)))))
+    fn set_value(content: VarContent, value: Type) {
+        content.replace(Some(value));
     }
 }
 
@@ -124,15 +101,23 @@ pub struct Signature {
 }
 
 impl Signature {
-    pub fn apply(&self, env: &TypeEnv) -> Result<TypeEnv, String> {
-        // 1. Refresh typeenv vars
-        // 2. Unify with arguments
-        // 3. Bind result variables
-        // 3.5 Concretise
-        // 4. Return result
-        // 5. ???
-        // 6. Profit! 
+    // Only to be called with fixed input
+    pub fn new(src: &str) -> Signature {
+        if let SignatureElement::Function(arg, ret) = lexer::lex_sig(src).unwrap() {
+            let mut vars = HashMap::new();
 
+            Signature {
+                arguments: sig_elems_to_type(arg, &mut vars),
+                results: sig_elems_to_type(ret, &mut vars)
+            }
+
+        }
+        else {
+            panic!("Welp, not a function")
+        }
+    }
+
+    pub fn apply(&self, env: &TypeEnv) -> Result<TypeEnv, String> {
         let arg_len = self.arguments.len();
         let stack_len = env.stack.len();
 
@@ -141,34 +126,54 @@ impl Signature {
         }
 
         let mut tenv = env.clone();
-        let mut args = self.arguments;
-        let mut results = self.results;
 
         for i in (0..arg_len).rev() {
-            let (stack_args, tenv) = &env.stack.pop().unwrap().refresh_vars(&tenv);
+            let stack_args = &tenv.stack.pop().unwrap().refresh_vars(&mut tenv);
 
-            let res = args[i].unify(stack_args)?;
-
-            if let Type::Variable(name, val) = res {
-                args = Type::bind_in(name, val, args);
-                results = Type::bind_in(name, val, results);
-            }
+            self.arguments[i].unify(stack_args)?;
         }
 
-        tenv.stack = [tenv.stack, results].concat();
+        tenv.stack.extend(self.results.clone());
 
         Ok(tenv)
-    } 
+    }   
+}
+
+fn sig_elems_to_type(elems: Vec<SignatureElement>, vars: &mut HashMap<String, VarContent>) -> Vec<Type> {
+    let convert = |elem| match elem {
+        SignatureElement::Kind(name, inner) =>
+            Type::Kind(name, sig_elems_to_type(inner, vars)),
+        
+        SignatureElement::Function(arg, res) => {
+            Type::Kind("function".to_string(), vec![
+                Type::Kind("arg".to_string(), sig_elems_to_type(arg, vars)),
+                Type::Kind("ret".to_string(), sig_elems_to_type(res, vars))
+            ])
+        },
+
+        SignatureElement::Variable(name) => {
+            if let Some(content) = vars.get(&name) {
+                Type::Variable(name, content.clone())
+            }
+            else {
+                Type::Variable(name, Rc::new(RefCell::new(None)))
+            }
+        },
+    };
+
+    elems.into_iter()
+        .map(convert)
+        .collect()
 }
 
 impl Display for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let args = self.arguments.into_iter()
+        let args = self.arguments.iter()
             .map(|arg| arg.to_string())
             .collect::<Vec<String>>()
             .join(" ");
         
-        let results = self.results.into_iter()
+        let results = self.results.iter()
             .map(|arg| arg.to_string())
             .collect::<Vec<String>>()
             .join(" ");
@@ -194,27 +199,75 @@ pub fn func_type(args: Vec<Type>, result: Vec<Type>) -> Type {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct TypeEnv {
-    var_counter: u32,
-    stack: Vec<Type>
+    pub var_counter: u32,
+    pub stack: Vec<Type>,
+    pub bindings: HashMap<String, Signature>
 }
 
 impl TypeEnv {
-    pub fn new_var(&self, val: Option<Box<Type>>) -> (Type, TypeEnv) {
-        let name = format!("v{}", self.var_counter);
-        
-        let mut copy = self.clone();
-        copy.var_counter += 1;
+    pub fn new(bindings: &Bindings) -> TypeEnv {
+        let mut env = TypeEnv {
+            var_counter: 0,
+            stack: vec![],
+            bindings: HashMap::new()
+        };
 
-        (Type::Variable(name, val), copy)
+        env.bindings = bindings
+            .clone()
+            .into_iter()
+            .map(|(key, action)| (key, action.signature(&env).unwrap()))
+            .collect();
+
+        env
+    }
+
+    pub fn new_var(&mut self, name: String, val: VarContent) -> Type {
+        let name = format!("{name}{}", self.var_counter);
+        self.var_counter += 1;
+
+        Type::Variable(name, val)
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct TypeNode {
-    token: Spaned<Token>,
-    signature: Signature,
-    type_env: TypeEnv
+    pub token: Spaned<Token>,
+    pub signature: Signature,
+    pub type_env: TypeEnv
 }
 
-pub fn typecheck(tokens: Vec<Spaned<Token>>) -> TResult<Vec<TypeNode>> {
+pub fn typecheck(tokens: Vec<Spaned<Token>>, init_env: TypeEnv) -> Result<Vec<TypeNode>, TErr> {
+    let token_to_node = |acc: (TypeEnv, Vec<TypeNode>), token: Spaned<Token>| {
+        let (current_env, mut buffer) = acc;
+        let maybe_sig = token.signature(&current_env);
 
+        match maybe_sig.clone().and_then(|sig| sig.apply(&current_env)) {
+            Ok(env) => {
+                buffer.push(TypeNode {
+                    token,
+                    signature: maybe_sig.unwrap().clone(),
+                    type_env: env.clone()
+                });
+
+                println!("{:?}", env.stack);
+
+                Ok((env, buffer))
+            },
+
+            Err(msg) => {
+                if let Err(a) = token.err_with(msg) {
+                    Err(a)
+                }
+                else {
+                    unreachable!()
+                }
+            }
+        }
+    };
+
+    tokens
+        .into_iter()
+        .try_fold((init_env, vec![]), token_to_node)
+        .map(|(_, nodes)| nodes)
 }
+

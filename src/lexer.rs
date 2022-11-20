@@ -5,7 +5,7 @@ use crate::{error::{Spaned, TErr}};
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
     Number(f32),
-    String(String),
+    Quote(String),
     Ident(String),
     List(Vec<Token>),
     Function(SignatureElement, Vec<Spaned<Token>>),
@@ -112,7 +112,7 @@ fn lexer() -> impl Parser<char, Vec<Spaned<Token>>, Error = Simple<char>> {
             .then_ignore(just('"'))
             .collect::<String>()
             .labelled("string")
-            .map_with_span(|str, span| Spaned::new(Token::String(str), span));
+            .map_with_span(|str, span| Spaned::new(Token::Quote(str), span));
 
         let block = rec
             .clone()
@@ -186,4 +186,12 @@ pub fn lex(src: &str) -> Result<Vec<Spaned<Token>>, TErr> {
     let (tokens, errs) = lexer().parse_recovery_verbose(src.to_string());
 
     tokens.map(preprocess_tokens).ok_or(errs)
+}
+
+pub fn num(val: f32) -> Spaned<Token> {
+    Spaned::new(Token::Number(val), 0..1)
+}
+
+pub fn str(val: String) -> Spaned<Token> {
+    Spaned::new(Token::Quote(val), 0..1)
 }

@@ -102,25 +102,9 @@ impl Type {
                 match content.borrow().as_ref() {
                     Some(inner) => inner.concretize(),
 
-                    None => panic!("Invalid function signature applied")
+                    None => self.clone()
                 }
             }
-        }
-    }
-
-    fn deep_clone(&self) -> Type {
-        use Type::*;
-    
-        match self {
-            Kind(name, types) => 
-                Kind(name.clone(), types
-                    .into_iter()
-                    .map(|typ| typ.deep_clone())
-                    .collect()),
-            
-            Variable(name, content) => 
-                Variable(name.clone(), Rc::new(RefCell::new(
-                        content.borrow().as_ref().cloned())))
         }
     }
 }
@@ -147,13 +131,13 @@ impl Display for Type {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct Signature {
-    arguments: Vec<Type>,
-    results: Vec<Type>
+    pub arguments: Vec<Type>,
+    pub results: Vec<Type>
 }
 
 impl Signature {
     // Only to be called with fixed input
-    pub fn new(src: &str) -> Signature {
+    pub fn new(src: &str) -> Self {
         if let SignatureElement::Function(arg, ret) = lexer::lex_sig(src).unwrap() {
             let mut vars = HashMap::new();
 
@@ -203,50 +187,8 @@ impl Signature {
         clear_list(&self.arguments);
         clear_list(&self.results);
     }
-
-    /*fn deep_clone_self(&self) -> Self {
-        let deep_copy = |list: &Vec<Type>| list.into_iter()
-            .map(|typ| typ.deep_clone())
-            .collect::<Vec<Type>>();
-
-        let mut a = deep_copy(&self.arguments);
-        let mut b = deep_copy(&self.results);
-
-        combine_variables(&mut a, &mut b);
-
-        Signature { arguments: a, results: b }
-    }*/
 }
 
-/*fn combine_variables(a: &mut Vec<Type>, b: &mut Vec<Type>) {
-    let mut map: HashMap<String, VarContent> = HashMap::new();
-
-    for i in 0..a.len() {
-
-        match a[i].clone() {
-            Type::Variable(name, content) => {
-                if let Some(val) = map.get(&name) { 
-                    a[i] = Type::Variable(name, val.clone());
-                }
-                else { 
-                    map.insert(name, content);
-                }
-            }
-
-            Type::Kind(name, types) => {
-                
-            }
-        }
-    }
-
-    for i in 0..b.len() {
-        if let Type::Variable(name, content) = b[i].clone() {
-            if let Some(val) = map.get(&name) { 
-                a[i] = Type::Variable(name, val.clone());
-            }
-        }
-    }
-}*/
 
 fn sig_elems_to_type(elems: Vec<SignatureElement>, vars: &mut HashMap<String, VarContent>) -> Vec<Type> {
     let convert = |elem| match elem {
@@ -338,20 +280,17 @@ impl TypeEnv {
 #[derive(Debug, Clone)]
 pub struct TypeNode {
     pub token: Spaned<Token>,
-    pub signature: Signature,
     pub type_env: TypeEnv
 }
 
 pub fn typecheck(tokens: Vec<Spaned<Token>>, init_env: TypeEnv) -> Result<Vec<TypeNode>, TErr> {
     let token_to_node = |acc: (TypeEnv, Vec<TypeNode>), token: Spaned<Token>| {
         let (current_env, mut buffer) = acc;
-        let maybe_sig = token.signature(&current_env);
 
-        match maybe_sig.clone().and_then(|sig| sig.apply(&current_env)) {
+        match token.signature(&current_env).and_then(|sig| sig.apply(&current_env)) {
             Ok(env) => {
                 buffer.push(TypeNode {
                     token,
-                    signature: maybe_sig.unwrap().clone(),
                     type_env: env.clone()
                 });
 
@@ -376,4 +315,3 @@ pub fn typecheck(tokens: Vec<Spaned<Token>>, init_env: TypeEnv) -> Result<Vec<Ty
         .try_fold((init_env, vec![]), token_to_node)
         .map(|(_, nodes)| nodes)
 }
-

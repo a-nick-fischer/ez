@@ -23,7 +23,7 @@ impl<'a> EnvAction<'a> for Add {
     }
 
     fn signature(&self, env: &TypeEnv) -> Result<Signature, String> {
-        Ok(Signature::new("('a) -> ('a 'a)"))
+        Ok(Signature::new("('a 'a) -> ('a)"))
     }
 }
 

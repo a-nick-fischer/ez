@@ -61,6 +61,21 @@ impl Type {
         }
     }
 
+    fn clear_vars(&self) {
+        use Type::*;
+
+        match self {
+            Kind(a, types) =>
+                types
+                    .into_iter()
+                    .for_each(|typ| typ.clear_vars()),
+
+            Variable(name, content) => { 
+                content.replace(None); 
+            },
+        }
+    }
+
     fn occurs(&self, var: &String) -> bool {
         use Type::*;
     
@@ -177,37 +192,61 @@ impl Signature {
 
         tenv.stack.extend(concrete);
 
+        self.clear_vars();
+
         Ok(tenv)
     }
 
-    fn deep_clone_self(&self) -> Self {
+    fn clear_vars(&self){
+        let clear_list = |list: &Vec<Type>| list.into_iter().for_each(|typ| typ.clear_vars());
+
+        clear_list(&self.arguments);
+        clear_list(&self.results);
+    }
+
+    /*fn deep_clone_self(&self) -> Self {
         let deep_copy = |list: &Vec<Type>| list.into_iter()
             .map(|typ| typ.deep_clone())
-            .collect();
+            .collect::<Vec<Type>>();
 
-        let a = deep_copy(&self.arguments);
-        let b = deep_copy(&self.results);
+        let mut a = deep_copy(&self.arguments);
+        let mut b = deep_copy(&self.results);
 
-        combine_variables(a, b);
+        combine_variables(&mut a, &mut b);
 
         Signature { arguments: a, results: b }
-    }
+    }*/
 }
 
-fn combine_variables(a: &mut Vec<Type>, b: &mut Vec<Type>) {
+/*fn combine_variables(a: &mut Vec<Type>, b: &mut Vec<Type>) {
     let mut map: HashMap<String, VarContent> = HashMap::new();
 
     for i in 0..a.len() {
-        if let Type::Variable(name, content) = a[i] {
-            if let Some(val) = map.get(&name) { 
-                content = val.clone();
+
+        match a[i].clone() {
+            Type::Variable(name, content) => {
+                if let Some(val) = map.get(&name) { 
+                    a[i] = Type::Variable(name, val.clone());
+                }
+                else { 
+                    map.insert(name, content);
+                }
             }
-            else { 
-                map.insert(name, content);
+
+            Type::Kind(name, types) => {
+                
             }
         }
     }
-}
+
+    for i in 0..b.len() {
+        if let Type::Variable(name, content) = b[i].clone() {
+            if let Some(val) = map.get(&name) { 
+                a[i] = Type::Variable(name, val.clone());
+            }
+        }
+    }
+}*/
 
 fn sig_elems_to_type(elems: Vec<SignatureElement>, vars: &mut HashMap<String, VarContent>) -> Vec<Type> {
     let convert = |elem| match elem {

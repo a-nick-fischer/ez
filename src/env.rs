@@ -1,4 +1,4 @@
-use crate::error::Spaned;
+use crate::error::*;
 use crate::lexer::Token;
 use crate::types::*;
 use std::collections::HashMap;
@@ -80,8 +80,26 @@ impl<'a> EnvAction<'a> for Spaned<Token> {
                 Ok(Signature::new(format!("() -> (list[{typ}])").as_str())) // Not the best approach...
             },
 
-            Token::Function(fun, tokens) => {
-                todo!()
+            Token::Function(sig, tokens) => {
+                let fun = Signature::from_sig(sig.clone());
+
+                let mut fun_env = tenv.clone();
+                fun_env.stack = fun.arguments.clone();
+
+                // We need more complex error handing...
+                let (new_env, _) =  typecheck(tokens.clone(), fun_env)
+                    .map_err(|err| err_to_str(err))?;
+                
+                // Return type check.. should be reworked prob
+                let ret_fun = Signature::from_types(fun.results.clone(), vec![]);
+                ret_fun.apply(&new_env)
+                    .map_err(|msg| format!("Function returns wrong type: {msg}"))?;
+
+                fun.clear_vars();
+
+                Ok(
+                    Signature::from_types(vec![], vec![fun.to_type()])
+                )
             },
             
             Token::Ident(ident) => 

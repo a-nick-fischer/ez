@@ -18,6 +18,13 @@ pub fn adhoc_error<M: ToString, T>(msg: M) -> Result<T, TErr> {
     )])
 }
 
+pub fn err_to_str(err: TErr) -> String {
+    err
+        .first()
+        .unwrap()
+        .to_string()
+}
+
 impl<T: Debug + Clone + PartialEq> Spaned<T> {
     pub fn new(content: T, range: Range<usize>) -> Self {
         Spaned(content, range)

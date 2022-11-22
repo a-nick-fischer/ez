@@ -138,18 +138,30 @@ pub struct Signature {
 impl Signature {
     // Only to be called with fixed input
     pub fn new(src: &str) -> Self {
-        if let SignatureElement::Function(arg, ret) = lexer::lex_sig(src).unwrap() {
+        Self::from_sig(lexer::lex_sig(src).unwrap())
+    }
+
+    pub fn from_types(arguments: Vec<Type>, results: Vec<Type>) -> Self {
+        Signature { arguments, results }
+    }
+
+    pub fn from_sig(sig: SignatureElement) -> Self {
+        if let SignatureElement::Function(arg, ret) = sig {
             let mut vars = HashMap::new();
 
-            Signature {
-                arguments: sig_elems_to_type(arg, &mut vars),
-                results: sig_elems_to_type(ret, &mut vars)
-            }
+            Self::from_types(
+                sig_elems_to_type(arg, &mut vars),
+                sig_elems_to_type(ret, &mut vars)
+            )
 
         }
         else {
             panic!("Welp, not a function")
         }
+    }
+
+    pub fn to_type(&self) -> Type {
+        func_type(self.arguments.clone(), self.results.clone())
     }
 
     pub fn apply(&self, env: &TypeEnv) -> Result<TypeEnv, String> {
@@ -181,7 +193,7 @@ impl Signature {
         Ok(tenv)
     }
 
-    fn clear_vars(&self){
+    pub fn clear_vars(&self){
         let clear_list = |list: &Vec<Type>| list.into_iter().for_each(|typ| typ.clear_vars());
 
         clear_list(&self.arguments);
@@ -280,18 +292,19 @@ impl TypeEnv {
 #[derive(Debug, Clone)]
 pub struct TypeNode {
     pub token: Spaned<Token>,
-    pub type_env: TypeEnv
+    pub signature: Signature
 }
 
-pub fn typecheck(tokens: Vec<Spaned<Token>>, init_env: TypeEnv) -> Result<Vec<TypeNode>, TErr> {
+pub fn typecheck(tokens: Vec<Spaned<Token>>, init_env: TypeEnv) -> Result<(TypeEnv, Vec<TypeNode>), TErr> {
     let token_to_node = |acc: (TypeEnv, Vec<TypeNode>), token: Spaned<Token>| {
         let (current_env, mut buffer) = acc;
+        let maybe_sig = token.signature(&current_env);
 
-        match token.signature(&current_env).and_then(|sig| sig.apply(&current_env)) {
+        match maybe_sig.clone().and_then(|sig| sig.apply(&current_env)) {
             Ok(env) => {
                 buffer.push(TypeNode {
                     token,
-                    type_env: env.clone()
+                    signature: maybe_sig.unwrap()
                 });
 
                 println!("{:?}", env.stack);
@@ -310,8 +323,9 @@ pub fn typecheck(tokens: Vec<Spaned<Token>>, init_env: TypeEnv) -> Result<Vec<Ty
         }
     };
 
-    tokens
+    let (tenv, nodes) = tokens
         .into_iter()
-        .try_fold((init_env, vec![]), token_to_node)
-        .map(|(_, nodes)| nodes)
+        .try_fold((init_env, vec![]), token_to_node)?;
+
+    Ok((tenv, nodes))
 }

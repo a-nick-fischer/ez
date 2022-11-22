@@ -1,3 +1,5 @@
+use core::fmt;
+
 use chumsky::prelude::*;
 
 use crate::{error::{Spaned, TErr}};
@@ -20,19 +22,18 @@ pub enum SignatureElement {
     Variable(String)
 }
 
-/* 
+
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Number(a) => write!(f, "{a}"),
-            Self::String(a) => write!(f, "\"{a}\""),
+            Self::Quote(a) => write!(f, "{a}"),
             Self::Ident(a) => write!(f, "'{a}'"),
-            Self::List(a) => write!(f, "[{a}]"),
-            Self::Function(args, ) => write!(f, "({sig})"),
+            //Self::List(a) => write!(f, "[{a}]"),
             _ => unimplemented!()
         }
     }
-}*/
+}
 
 fn ident_lexer() -> impl Parser<char, String, Error = Simple<char>> + Clone {
     let punctuation = filter(|c: &char| {

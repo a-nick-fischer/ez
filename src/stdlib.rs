@@ -97,6 +97,18 @@ define_func!(
     }
 );
 
+define_func!(
+    Drop ( "('a) -> ()" ) |env: &'a mut Env<'a>| {
+        env.pops();
+    }
+);
+
+define_func!(
+    Print ( "('a) -> ()" ) |env: &'a mut Env<'a>| {
+        println!("{}", env.pop())
+    }
+);
+
 
 pub fn stdlib<'a>() -> Bindings<'a> {
     let mut map: HashMap<String, Action<'a>> = HashMap::new();
@@ -107,7 +119,9 @@ pub fn stdlib<'a>() -> Bindings<'a> {
         "mul" => Mul,
         "dup" => Dup,
         "swap" => Swap,
-        "over" => Over
+        "over" => Over,
+        "_" => Drop,
+        "print" => Print
     );
 
     map

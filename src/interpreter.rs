@@ -21,10 +21,8 @@ impl<'b> Interpreter<'b> {
             .and_then(|tokens| typecheck(tokens, self.tenv.clone()));
 
         match result {
-            Ok(types) => {
-                if let Some(node) = types.last() {
-                    self.tenv = node.type_env.clone();
-                }
+            Ok((env, nodes)) => {
+                self.tenv = env;
             },
 
             Err(errs) => report_errors(&src, errs)

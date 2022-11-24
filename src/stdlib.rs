@@ -26,8 +26,8 @@ macro_rules! define_func {
                 $act(env);
             }
 
-            fn signature(&self, _: &TypeEnv) -> Result<Signature, String> {
-                Ok(Signature::new($sig))
+            fn signature(&self, _: &TypeEnv) -> Result<Arc<dyn TypeEnvMod>, String> {
+                Ok(Arc::new(Signature::new($sig)))
             }
         }
     }

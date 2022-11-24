@@ -1,6 +1,6 @@
 use crate::{error::{Spaned, TErr}, lexer::{Token, self, SignatureElement}, env::{EnvAction, Bindings}};
 
-use std::{fmt::{Display, Formatter}, rc::Rc, cell::RefCell, collections::HashMap};
+use std::{fmt::{Display, Debug, Formatter}, rc::Rc, cell::RefCell, collections::HashMap, sync::Arc};
 
 
 type VarContent = Rc<RefCell<Option<Type>>>;
@@ -12,7 +12,7 @@ pub enum Type {
 }
 
 impl Type {
-    fn unify<'a>(&'a self, other: &'a Self) -> Result<(), String> {
+    pub fn unify<'a>(&'a self, other: &'a Self) -> Result<(), String> {
         use Type::*;
 
         match (self, other) {
@@ -47,7 +47,7 @@ impl Type {
         }
     }
 
-    fn refresh_vars(&self, env: &mut TypeEnv) -> Type {
+    pub fn refresh_vars(&self, env: &mut TypeEnv) -> Type {
         use Type::*;
 
         match self {
@@ -65,14 +65,28 @@ impl Type {
         use Type::*;
 
         match self {
-            Kind(a, types) =>
+            Kind(_, types) =>
                 types
                     .into_iter()
                     .for_each(|typ| typ.clear_vars()),
 
-            Variable(name, content) => { 
+            Variable(_, content) => { 
                 content.replace(None); 
             },
+        }
+    }
+
+    pub fn has_bound_vars(&self) -> bool {
+        use Type::*;
+
+        match self {
+            Kind(_, types) =>
+                types
+                    .into_iter()
+                    .any(|typ| typ.has_bound_vars()),
+
+            Variable(_, content) => 
+                content.borrow().is_some(),
         }
     }
 
@@ -129,42 +143,29 @@ impl Display for Type {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub struct Signature {
-    pub arguments: Vec<Type>,
-    pub results: Vec<Type>
+pub fn tlist_to_str(list: &Vec<Type>) -> String {
+    format!("[{}]", list.into_iter()
+        .map(|t| t.to_string())
+        .collect::<Vec<String>>()
+        .join(" "))
 }
 
-impl Signature {
-    // Only to be called with fixed input
-    pub fn new(src: &str) -> Self {
-        Self::from_sig(lexer::lex_sig(src).unwrap())
-    }
+pub trait TypeEnvMod: Debug {
+    fn apply(&self, env: &TypeEnv) -> Result<TypeEnv, String>;
 
-    pub fn from_types(arguments: Vec<Type>, results: Vec<Type>) -> Self {
-        Signature { arguments, results }
-    }
+    fn arguments(&self) -> Vec<Type>;
 
-    pub fn from_sig(sig: SignatureElement) -> Self {
-        if let SignatureElement::Function(arg, ret) = sig {
-            let mut vars = HashMap::new();
+    fn results(&self) -> Vec<Type>;
+}
 
-            Self::from_types(
-                sig_elems_to_type(arg, &mut vars),
-                sig_elems_to_type(ret, &mut vars)
-            )
+#[derive(Clone, PartialEq, Debug)]
+pub struct Signature {
+    arguments: Vec<Type>,
+    results: Vec<Type>
+}
 
-        }
-        else {
-            panic!("Welp, not a function")
-        }
-    }
-
-    pub fn to_type(&self) -> Type {
-        func_type(self.arguments.clone(), self.results.clone())
-    }
-
-    pub fn apply(&self, env: &TypeEnv) -> Result<TypeEnv, String> {
+impl TypeEnvMod for Signature {
+    fn apply(&self, env: &TypeEnv) -> Result<TypeEnv, String> {
         let arg_len = self.arguments.len();
         let stack_len = env.stack.len();
 
@@ -193,6 +194,79 @@ impl Signature {
         Ok(tenv)
     }
 
+    fn arguments(&self) -> Vec<Type> {
+        self.arguments.clone()
+    }
+
+    fn results(&self) -> Vec<Type> {
+        self.results.clone()
+    }
+}
+
+impl Signature {
+    // Only to be called with fixed input
+    pub fn new(src: &str) -> Self {
+        Self::from_sig(lexer::lex_sig(src).unwrap())
+    }
+
+    pub fn from_func_type(func: Type) -> Option<Self> {
+        let args = Rc::new(RefCell::new(None));
+        let res = Rc::new(RefCell::new(None));
+
+        let typ = Type::Kind("fun".to_string(), vec![
+            Type::Variable("_a".to_string(), args.clone()),
+            Type::Variable("_b".to_string(), res.clone())
+        ]);
+
+        if typ.unify(&func).is_err() {
+            println!("{:?}", typ.unify(&func));
+            return None;
+        }
+            
+        let a = args.borrow().clone();
+        let b = res.borrow().clone();
+
+        if let (Some(Type::Kind(aname, arguments)), Some(Type::Kind(bname, returns))) = (a, b) {
+            if aname != "arg" || bname != "ret" {
+                panic!("Invalid func type")
+            }
+
+            Some(Signature::from_types(arguments.clone(), returns.clone()))
+        }
+        else {
+            panic!("Invalid func type")
+        }
+    }
+
+    pub fn from_types(arguments: Vec<Type>, results: Vec<Type>) -> Self {
+        Signature { arguments, results }
+    }
+
+    pub fn from_sig(sig: SignatureElement) -> Self {
+        if let SignatureElement::Function(arg, ret) = sig {
+            let mut vars = HashMap::new();
+
+            Self::from_types(
+                sig_elems_to_type(arg, &mut vars),
+                sig_elems_to_type(ret, &mut vars)
+            )
+
+        }
+        else {
+            panic!("Welp, not a function")
+        }
+    }
+
+    pub fn to_type(&self) -> Type {
+        func_type(self.arguments.clone(), self.results.clone())
+    }
+
+    pub fn has_bound_vars(&self) -> bool {
+        let has_binds = |list: &Vec<Type>| list.into_iter().any(|t| t.has_bound_vars());
+
+        has_binds(&self.arguments) || has_binds(&self.results)
+    }
+
     pub fn clear_vars(&self){
         let clear_list = |list: &Vec<Type>| list.into_iter().for_each(|typ| typ.clear_vars());
 
@@ -208,7 +282,7 @@ fn sig_elems_to_type(elems: Vec<SignatureElement>, vars: &mut HashMap<String, Va
             Type::Kind(name, sig_elems_to_type(inner, vars)),
         
         SignatureElement::Function(arg, res) => {
-            Type::Kind("function".to_string(), vec![
+            Type::Kind("fun".to_string(), vec![
                 Type::Kind("arg".to_string(), sig_elems_to_type(arg, vars)),
                 Type::Kind("ret".to_string(), sig_elems_to_type(res, vars))
             ])
@@ -242,6 +316,52 @@ impl Display for Signature {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct Assigment {
+    var_name: String
+}
+
+impl Assigment {
+    pub fn new(var_name: String) -> Self {
+        Assigment { var_name }
+    }
+}
+
+impl TypeEnvMod for Assigment {
+    fn apply(&self, env: &TypeEnv) -> Result<TypeEnv, String> {
+        let mut copy = env.clone();
+
+        let maybe_elem = copy.stack.pop();
+
+        if let Some(typ) = maybe_elem {
+
+            let maybe_func = Signature::from_func_type(typ.clone());
+
+            let sig = if let Some(inner) = maybe_func { 
+                inner 
+            }
+            else {
+                Signature::from_types(vec![], vec![typ])
+            };
+
+            copy.bindings.insert(self.var_name.to_string(), Arc::new(sig));
+            
+            Ok(copy)
+
+        } else {
+            Err(format!("Empty stack, no value to assign to {}", self.var_name))
+        }
+    }
+
+    fn arguments(&self) -> Vec<Type> {
+        vec![string_type(), var_type("a")]
+    }
+
+    fn results(&self) -> Vec<Type> {
+        vec![]
+    }
+}
+
 pub fn string_type() -> Type {
     Type::Kind("str".to_string(), vec![])
 }
@@ -257,11 +377,15 @@ pub fn func_type(args: Vec<Type>, result: Vec<Type>) -> Type {
     ])
 }
 
-#[derive(Clone, PartialEq, Debug)]
+pub fn var_type(name: &str) -> Type {
+    Type::Variable(name.to_string(), Rc::new(RefCell::new(None)))
+}
+
+#[derive(Clone, Debug)]
 pub struct TypeEnv {
     pub var_counter: u32,
     pub stack: Vec<Type>,
-    pub bindings: HashMap<String, Signature>
+    pub bindings: HashMap<String, Arc<dyn TypeEnvMod>>
 }
 
 impl TypeEnv {
@@ -292,7 +416,7 @@ impl TypeEnv {
 #[derive(Debug, Clone)]
 pub struct TypeNode {
     pub token: Spaned<Token>,
-    pub signature: Signature
+    pub signature: Arc<dyn TypeEnvMod>
 }
 
 pub fn typecheck(tokens: Vec<Spaned<Token>>, init_env: TypeEnv) -> Result<(TypeEnv, Vec<TypeNode>), TErr> {

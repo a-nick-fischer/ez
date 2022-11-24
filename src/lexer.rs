@@ -9,10 +9,10 @@ pub enum Token {
     Number(f32),
     Quote(String),
     Ident(String),
+    Assigment(String),
     List(Vec<Token>),
     Function(SignatureElement, Vec<Spaned<Token>>),
-    Newline,
-    Invalid,
+    Newline
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -37,7 +37,7 @@ impl fmt::Display for Token {
 
 fn ident_lexer() -> impl Parser<char, String, Error = Simple<char>> + Clone {
     let punctuation = filter(|c: &char| {
-        c.is_ascii_punctuation() && !['[', ']', '{', '}', '(', ')', '"', '\'', '$'].contains(c)
+        c.is_ascii_punctuation() && !['[', ']', '{', '}', ':', '(', ')', '"', '\'', '$'].contains(c)
     });
 
     filter(|c: &char| c.is_alphabetic())
@@ -99,6 +99,11 @@ fn lexer() -> impl Parser<char, Vec<Spaned<Token>>, Error = Simple<char>> {
             .labelled("identifier")
             .map_with_span(|str, span| Spaned::new(Token::Ident(str), span));
 
+        let assigment = ident_lexer()
+            .then_ignore(just(':'))
+            .labelled("assigment")
+            .map_with_span(|str, span| Spaned::new(Token::Assigment(str), span));
+
         let escape = just('\\')
             .ignore_then(
                 just('\\')
@@ -151,6 +156,7 @@ fn lexer() -> impl Parser<char, Vec<Spaned<Token>>, Error = Simple<char>> {
 
         string
             .or(number)
+            .or(assigment)
             .or(ident)
             .or(function)
             .or(block)

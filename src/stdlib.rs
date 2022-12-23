@@ -7,7 +7,7 @@ use crate::env::*;
 use crate::types::*;
 
 lazy_static! {
-    pub static ref STDLIB: Bindings<'static> = stdlib();
+    pub static ref STDLIB: Bindings = stdlib();
 }
 
 macro_rules! define_func {
@@ -21,8 +21,8 @@ macro_rules! define_func {
             }
         }
 
-        impl<'a> EnvAction<'a> for $struct_name {
-            fn act(&self, env: &'a mut Env<'a>) {
+        impl EnvAction for $struct_name {
+            fn act(&self, env: &mut Env) {
                 $act(env);
             }
 
@@ -40,7 +40,7 @@ macro_rules! add_funcs {
 }
 
 define_func!(
-    Add ( "(num num) -> (num)" ) |env: &'a mut Env<'a>| {
+    Add ( "(num num) -> (num)" ) |env: &mut Env| {
         match (env.pop(), env.pop()){
             (Number(a), Number(b)) => env.push(num(a + b)),
 
@@ -50,7 +50,7 @@ define_func!(
 );
 
 define_func!(
-    Sub ( "(num num) -> (num)" ) |env: &'a mut Env<'a>| {
+    Sub ( "(num num) -> (num)" ) |env: &mut Env| {
         match (env.pop(), env.pop()){
             (Number(a), Number(b)) => env.push(num(a - b)),
 
@@ -60,7 +60,7 @@ define_func!(
 );
 
 define_func!(
-    Mul ( "(num num) -> (num)" ) |env: &'a mut Env<'a>| {
+    Mul ( "(num num) -> (num)" ) |env: &mut Env| {
         match (env.pop(), env.pop()){
             (Number(a), Number(b)) => env.push(num(a * b)),
 
@@ -70,7 +70,7 @@ define_func!(
 );
 
 define_func!(
-    Dup ( "('a) -> ('a 'a)" ) |env: &'a mut Env<'a>| {
+    Dup ( "('a) -> ('a 'a)" ) |env: &mut Env| {
         let val = env.pops();
         env.push(val.clone());
         env.push(val);
@@ -78,7 +78,7 @@ define_func!(
 );
 
 define_func!(
-    Swap ( "('a 'b) -> ('b 'a)" ) |env: &'a mut Env<'a>| {
+    Swap ( "('a 'b) -> ('b 'a)" ) |env: &mut Env| {
         let a = env.pops();
         let b = env.pops();
         env.push(a);
@@ -87,7 +87,7 @@ define_func!(
 );
 
 define_func!(
-    Over ( "('a 'b 'c) -> ('c 'b 'a)" ) |env: &'a mut Env<'a>| {
+    Over ( "('a 'b 'c) -> ('c 'b 'a)" ) |env: &mut Env| {
         let a = env.pops();
         let b = env.pops();
         let c = env.pops();
@@ -98,20 +98,20 @@ define_func!(
 );
 
 define_func!(
-    Drop ( "('a) -> ()" ) |env: &'a mut Env<'a>| {
+    Drop ( "('a) -> ()" ) |env: &mut Env| {
         env.pops();
     }
 );
 
 define_func!(
-    Print ( "('a) -> ()" ) |env: &'a mut Env<'a>| {
+    Print ( "('a) -> ()" ) |env: &mut Env| {
         println!("{}", env.pop())
     }
 );
 
 
-pub fn stdlib<'a>() -> Bindings<'a> {
-    let mut map: HashMap<String, Action<'a>> = HashMap::new();
+pub fn stdlib() -> Bindings {
+    let mut map: HashMap<String, Action> = HashMap::new();
 
     add_funcs!(map,
         "add" => Add,

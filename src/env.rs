@@ -5,17 +5,17 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-pub type Bindings<'a> = HashMap<String, Action<'a>>;
+pub type Bindings = HashMap<String, Action>;
 
 #[derive(Debug)]
-pub struct Env<'a> {
+pub struct Env {
     stack: Vec<Spaned<Token>>,
-    vars: Bindings<'a>
+    vars: Bindings
 }
 
-impl<'a> Env<'a> {
-    pub fn new() -> Self {
-        Env { stack: Vec::new(), vars: HashMap::new() }
+impl Env {
+    pub fn new(vars: Bindings) -> Self {
+        Env { stack: Vec::new(), vars }
     }
 
     pub fn push(&mut self, value: Spaned<Token>) {
@@ -30,31 +30,31 @@ impl<'a> Env<'a> {
         self.stack.pop().unwrap()
     }
 
-    pub fn get_var(&self, ident: &String) -> Action<'a> {
+    pub fn get_var(&self, ident: &String) -> Action {
         self.vars.get(ident).unwrap().clone()
     }
 
-    pub fn set_var(&mut self, ident: &String, value: Action<'a>){
+    pub fn set_var(&mut self, ident: &String, value: Action){
         self.vars.insert(ident.to_owned(), value);
     }
 }
 
-pub type Action<'a> = Arc<dyn EnvAction<'a> + Send + Sync>;
+pub type Action = Arc<dyn EnvAction + Send + Sync>;
 
-pub trait EnvAction<'a>: Debug {
-    fn act(&self, env: &'a mut Env<'a>);
+pub trait EnvAction: Debug {
+    fn act(&self, env: &mut Env);
 
     fn signature(&self, tenv: &TypeEnv) -> Result<Arc<dyn TypeEnvMod>, String>;
 }
 
-impl<'a> EnvAction<'a> for Spaned<Token> {
-    fn act(&self, env: &'a mut Env<'a>) {
+impl EnvAction for Spaned<Token> {
+    fn act(&self, env: &mut Env) {
         match self.content() {
             Token::Number(_) | Token::Quote(_) => env.push(self.clone()),
             
             Token::Ident(ident) => env.get_var(&ident).act(env),
 
-            _ => unreachable!()
+            _ => todo!()
         }
     }
 

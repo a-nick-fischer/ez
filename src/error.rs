@@ -3,20 +3,9 @@ use chumsky::error::SimpleReason::*;
 use chumsky::prelude::*;
 use yansi::Paint;
 
-use std::ops::Range;
-use std::fmt::Debug;
+use crate::lexer::token::Token;
 
 pub type TErr = Vec<Simple<char>>;
-
-#[derive(Debug, Clone)]
-pub struct Spaned<T: Debug + Clone + PartialEq>(T, Range<usize>);
-
-pub fn adhoc_error<M: ToString, T>(msg: M) -> Result<T, TErr> {
-    Err(vec![ Simple::custom(
-        0..1, 
-        msg
-    )])
-}
 
 pub fn err_to_str(err: TErr) -> String {
     err
@@ -25,39 +14,14 @@ pub fn err_to_str(err: TErr) -> String {
         .to_string()
 }
 
-impl<T: Debug + Clone + PartialEq> Spaned<T> {
-    pub fn new(content: T, range: Range<usize>) -> Self {
-        Spaned(content, range)
-    }
-
-    pub fn content(&self) -> &T {
-        &self.0
-    }
-
-    pub fn range(&self) -> &Range<usize> {
-        &self.1
-    }
-
-    pub fn err_with<M: ToString>(&self, msg: M) -> Result<Spaned<T>, TErr> {
-        Err(vec![ Simple::custom(
+impl Token {
+    pub fn to_error<M: ToString>(&self, msg: M) -> TErr {
+        vec![ Simple::custom(
             self.range().clone(),
             msg
-        )])
+        )]
     }
 }
-
-impl<T: Debug + Clone + PartialEq> PartialEq for Spaned<T> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
-    }
-}
-
-
-/*impl<T: Debug + Clone + PartialEq> Display for Spaned<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0.to_string())
-    }
-}*/
 
 pub fn report_errors(src: &str, errs: Vec<Simple<char>>) {
     errs.into_iter()

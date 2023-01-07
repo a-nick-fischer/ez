@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::lexer::*;
-use crate::lexer::Token::*;
 use crate::env::*;
 use crate::types::*;
 

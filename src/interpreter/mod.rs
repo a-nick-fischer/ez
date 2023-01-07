@@ -1,8 +1,6 @@
 use crate::env::*;
-use crate::error::Spaned;
 use crate::error::report_errors;
 use crate::lexer::*;
-use crate::types::*;
 
 pub struct Interpreter {
     tenv: TypeEnv,

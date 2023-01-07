@@ -7,44 +7,19 @@ use std::sync::Arc;
 
 pub type Bindings = HashMap<String, Action>;
 
-#[derive(Debug)]
-pub struct Env {
-    stack: Vec<Spaned<Token>>,
-    vars: Bindings
-}
-
-impl Env {
-    pub fn new(vars: Bindings) -> Self {
-        Env { stack: Vec::new(), vars }
-    }
-
-    pub fn push(&mut self, value: Spaned<Token>) {
-        self.stack.push(value);
-    }
-
-    pub fn pop(&mut self) -> Token {
-        self.stack.pop().unwrap().content().clone()
-    }
-
-    pub fn pops(&mut self) -> Spaned<Token> {
-        self.stack.pop().unwrap()
-    }
-
-    pub fn get_var(&self, ident: &String) -> Action {
-        self.vars.get(ident).unwrap().clone()
-    }
-
-    pub fn set_var(&mut self, ident: &String, value: Action){
-        self.vars.insert(ident.to_owned(), value);
-    }
-}
-
 pub type Action = Arc<dyn EnvAction + Send + Sync>;
 
 pub trait EnvAction: Debug {
     fn act(&self, env: &mut Env);
 
     fn signature(&self, tenv: &TypeEnv) -> Result<Arc<dyn TypeEnvMod>, String>;
+}
+
+pub fn tlist_to_str(list: &Vec<Type>) -> String {
+    format!("[{}]", list.into_iter()
+        .map(|t| t.to_string())
+        .collect::<Vec<String>>()
+        .join(" "))
 }
 
 impl EnvAction for Spaned<Token> {

@@ -1,12 +1,12 @@
-use std::{fmt::{Display, Debug, Formatter}, rc::Rc, cell::RefCell};
+use std::{fmt::{Display, Debug, Formatter}, rc::Rc, cell::RefCell, borrow::Borrow};
 
-use super::type_env::TypeEnv;
+use super::{type_env::TypeEnv, typelist::TypeList, *};
 
 pub type VarContent = Rc<RefCell<Option<Type>>>;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Type {
-    Kind(String, Vec<Type>),
+    Kind(String, TypeList),
     Variable(String, VarContent)
 }
 
@@ -18,8 +18,9 @@ impl Type {
             // Unify types
             (Kind(a, types_a), Kind(b, types_b)) if a == b && types_a.len() == types_b.len() =>
                 types_a
+                    .vec()
                     .into_iter()
-                    .zip(types_b)
+                    .zip(types_b.vec())
                     .map(|(a, b)| a.unify(b))
                     .collect(),
             
@@ -51,12 +52,10 @@ impl Type {
 
         match self {
             Kind(a, types) =>
-                Kind(a.clone(), types
-                        .into_iter()
-                        .map(|typ| typ.refresh_vars(env))
-                        .collect()),
+                Kind(a.clone(), types.refresh_vars(env)),
 
-            Variable(name, content) => env.new_var(name.clone(), content.borrow().clone()),
+            Variable(name, content) => 
+                env.new_var(name.clone(), content.borrow().clone()),
         }
     }
 
@@ -64,10 +63,7 @@ impl Type {
         use Type::*;
 
         match self {
-            Kind(_, types) =>
-                types
-                    .into_iter()
-                    .for_each(|typ| typ.clear_vars()),
+            Kind(_, types) => types.clear_vars(),
 
             Variable(_, content) => { 
                 content.replace(None); 
@@ -80,21 +76,18 @@ impl Type {
 
         match self {
             Kind(_, types) =>
-                types
-                    .into_iter()
-                    .any(|typ| typ.has_bound_vars()),
+                types.has_bound_vars(),
 
             Variable(_, content) => 
                 content.borrow().is_some(),
         }
     }
 
-    fn occurs(&self, var: &String) -> bool {
+    pub fn occurs(&self, var: &String) -> bool {
         use Type::*;
     
         match self {
-            Kind(_, types) => 
-                types.into_iter().any(|t| t.occurs(var)),
+            Kind(_, types) => types.occurs(var),
             
             Variable(name, content) => 
                 var == name || content.borrow().as_ref().map_or(false, |inner| inner.occurs(var))
@@ -106,10 +99,7 @@ impl Type {
     
         match self {
             Kind(name, types) => 
-                Kind(name.clone(), types
-                    .into_iter()
-                    .map(|typ| typ.concretize())
-                    .collect()),
+                Kind(name.clone(), types.concretize()),
             
             Variable(_, content) => {
                 match content.borrow().as_ref() {
@@ -119,6 +109,33 @@ impl Type {
                 }
             }
         }
+    }
+
+    pub fn extract_function(&self) -> Option<(TypeList, TypeList)> {
+        let args = Rc::new(RefCell::new(None));
+        let res = Rc::new(RefCell::new(None));
+
+        let typ = typ("fun", vec![
+            var_type_raw("_a", args.clone()),
+            var_type_raw("_b", res.clone())
+        ]);
+
+        let res = typ.unify(&self);
+        if res.is_err() {
+            return None;
+        }
+            
+        let a = args.borrow().clone();
+        let b = res.borrow().clone();
+
+        if let (Some(Type::Kind(aname, arguments)), Some(Type::Kind(bname, returns))) = (a, b) {
+            if aname != "arg" || bname != "ret" {
+                panic!("Invalid func type") // TODO Error handling
+            }
+
+            Some((arguments.clone(), returns.clone()))
+        }
+        else { None }
     }
 }
 

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::env::*;
-use crate::types::*;
+use crate::parser::*;
 
 lazy_static! {
     pub static ref STDLIB: Bindings = stdlib();

@@ -1,23 +1,21 @@
 use std::{cell::RefCell, rc::Rc, collections::HashMap};
 
-use crate::env_modifier::EnvModifier;
+use super::{typelist::TypeList, types::Type};
 
-use super::types::Type;
-
-pub type TypeEnvModifier = Rc<dyn EnvModifier<TypeEnv>>;
+pub type TypeBindings = HashMap<String, Type>;
 
 #[derive(Clone, Debug)]
 pub struct TypeEnv {
     pub var_counter: u32,
-    pub stack: Vec<Type>,
-    pub bindings: HashMap<String, Type>
+    pub stack: TypeList,
+    pub bindings: TypeBindings
 }
 
 impl TypeEnv {
-    pub fn new(bindings: &HashMap<String, Type>) -> Self {
+    pub fn new(bindings: &TypeBindings) -> Self {
         Self {
             var_counter: 0,
-            stack: vec![],
+            stack: TypeList::new(),
             bindings: bindings.clone()
         }
     }

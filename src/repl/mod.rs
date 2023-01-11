@@ -1,17 +1,22 @@
 mod repl_helper;
 
+use std::collections::HashMap;
+
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use yansi::Paint;
 
 use repl_helper::ReplHelper;
-use crate::interpreter::Interpreter;
-use crate::stdlib::STDLIB;
+
+use crate::error::report_errors;
+use crate::lexer::lex;
+use crate::parser::parse;
+use crate::parser::types::type_env::TypeEnv;
 
 const HISTORY_FILE_PATH: &str = ".why_history";
 
 pub fn repl() {
-    let mut interpreter = Interpreter::new(&STDLIB);
+    let type_env = &mut TypeEnv::new(&HashMap::new());    
 
     let helper = ReplHelper::new();
     let mut rl = Editor::new().expect("Could not create editor!");
@@ -32,7 +37,14 @@ pub fn repl() {
         match readline {
             Ok(line) => {
                 rl.add_history_entry(line.as_str());
-                interpreter.run(line);
+                
+                let res = lex(line.as_str())
+                    .and_then(|tokens| parse(tokens, type_env).map_err(|e| vec![e]));
+
+                match res {
+                    Ok(nodes) => println!("{nodes:?}"),
+                    Err(errs) => report_errors(line, errs),
+                }
             },
 
             Err(ReadlineError::Interrupted) => {

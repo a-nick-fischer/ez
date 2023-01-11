@@ -1,4 +1,4 @@
-use crate::{error::TErr, lexer::token::Token};
+use crate::{error::Error, lexer::token::Token};
 
 use super::{type_env::TypeEnv, typelist::TypeList, types::types::Type};
 
@@ -30,41 +30,55 @@ pub enum Node {
 }
 
 impl Node {
-    pub fn apply(&self, env: &mut TypeEnv) -> Result<(), TErr> {
+    pub fn apply(&self, env: &mut TypeEnv) -> Result<(), Error> {
         match self {
-            Node::Assigment { name, token, typ } => todo!(),
-            Node::Variable { name, token, typ } => todo!(),
-            Node::Call { name, token, arguments, returns } => todo!(),
-            Node::Literal { typ, token } => todo!(),
+            Node::Assigment { name, typ, .. } => {
+                env.bindings.insert(name.clone(), typ.clone());
+                Ok(())
+            },
+
+            Node::Variable { typ, .. } => {
+                env.stack.push(typ.clone());
+                Ok(())
+            },
+
+            Node::Call { name, arguments, returns, token } => {            
+                let arg_len = arguments.len();
+                let stack_len = env.stack.len();
+            
+                if arg_len > stack_len {
+                    return Err(Error::WrongArguments { 
+                        fname: name.clone(), token: token.clone(), expected: arguments.clone(), got: env.stack.clone() 
+                    })
+                }
+
+                let args = arguments.vec();
+            
+                let mut tenv = env.clone();
+            
+                for i in (0..arg_len).rev() {
+                    let stack_args = &tenv.stack.pop().unwrap().refresh_vars(&mut tenv);
+            
+                    args[i].unify(stack_args)
+                        .map_err(|_| Error::WrongArguments { 
+                            fname: name.clone(), token: token.clone(), expected: arguments.clone(), got: env.stack.clone() 
+                        })?;
+                }
+            
+                tenv.stack.extend(returns.concretize());
+            
+                arguments.clear_vars();
+                returns.clear_vars();
+            
+                *env = tenv;
+            
+                Ok(())
+            },
+
+            Node::Literal { typ, .. } => {
+                env.stack.push(typ.clone());
+                Ok(())
+            },
         }
     }
-}
-
-fn call(arguments: &TypeList, returns: &TypeList, env: &mut TypeEnv) -> Result<(), TErr>  {
-    let args = arguments.vec();
-    let res = returns.vec();
-
-    let arg_len = args.len();
-    let stack_len = env.stack.len();
-
-    if arg_len > stack_len {
-        panic!("Expected {} elem on the stack, got {}", arg_len, stack_len) // TODO Error handling
-    }
-
-    let mut tenv = env.clone();
-
-    for i in (0..arg_len).rev() {
-        let stack_args = &tenv.stack.pop().unwrap().refresh_vars(&mut tenv);
-
-        args[i].unify(stack_args).unwrap(); // TODO Error handling
-    }
-
-    tenv.stack.extend(returns.concretize());
-
-    arguments.clear_vars();
-    returns.clear_vars();
-
-    *env = tenv;
-
-    Ok(())
 }

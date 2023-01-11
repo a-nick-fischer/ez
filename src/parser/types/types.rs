@@ -1,6 +1,8 @@
-use std::{fmt::{Display, Debug, Formatter}, rc::Rc, cell::RefCell, borrow::Borrow};
+use std::{rc::Rc, cell::RefCell, fmt::{Display, Formatter}};
 
-use super::{type_env::TypeEnv, typelist::TypeList, *};
+use ariadne::{Color, Fmt};
+
+use super::{typelist::TypeList, type_env::TypeEnv, typ, var_type_raw};
 
 pub type VarContent = Rc<RefCell<Option<Type>>>;
 
@@ -35,7 +37,11 @@ impl Type {
                     Ok(())
                 }
                 else if other.occurs(vname) {
-                    Err(format!("Type {other} contains typevar {vname}"))
+                    Err(format!(
+                        "Occurs Check: Type {} contains typevar {}",
+                        other.fg(Color::Cyan),
+                        vname.fg(Color::Cyan),
+                    ))
                 }
                 else {
                     content.replace(Some(other.clone()));
@@ -43,7 +49,11 @@ impl Type {
                 }
             }
  
-            (_, _) => Err(format!("Type Mismatch: {self} and {other}"))
+            (_, _) => Err(format!(
+                "Type Mismatch: {} and {}",
+                self.fg(Color::Cyan),
+                other.fg(Color::Cyan)
+            ))
         }
     }
 
@@ -120,19 +130,15 @@ impl Type {
             var_type_raw("_b", res.clone())
         ]);
 
-        let res = typ.unify(&self);
-        if res.is_err() {
+        let unified = typ.unify(&self);
+        if unified.is_err() {
             return None;
         }
             
         let a = args.borrow().clone();
         let b = res.borrow().clone();
 
-        if let (Some(Type::Kind(aname, arguments)), Some(Type::Kind(bname, returns))) = (a, b) {
-            if aname != "arg" || bname != "ret" {
-                panic!("Invalid func type") // TODO Error handling
-            }
-
+        if let (Some(Type::Kind(_, arguments)), Some(Type::Kind(_, returns))) = (a, b) {
             Some((arguments.clone(), returns.clone()))
         }
         else { None }
@@ -146,6 +152,7 @@ impl Display for Type {
         match self {
             Kind(name, types) => {
                 let type_str = types
+                    .vec()
                     .into_iter()
                     .map(|t| format!("[{t}]"))
                     .collect::<Vec<String>>()

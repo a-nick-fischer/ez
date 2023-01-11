@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::{types::Type, type_env::TypeEnv};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -14,6 +16,10 @@ impl TypeList {
 
     pub fn pop(&mut self) -> Option<Type> {
         self.0.pop()
+    }
+
+    pub fn push(&mut self, typ: Type) {
+        self.0.push(typ)
     }
 
     pub fn clear(&mut self) {
@@ -33,21 +39,22 @@ impl TypeList {
     }
 
     pub fn clear_vars(&self) { 
-        self.0.into_iter().for_each(|typ| typ.clear_vars())
+        self.0.iter().for_each(|typ| typ.clear_vars())
     }
 
     pub fn refresh_vars(&self, env: &mut TypeEnv) -> TypeList {
-        TypeList(self.0.into_iter()
+        TypeList(self.0.clone()
+            .into_iter()
             .map(|typ| typ.refresh_vars(env))
             .collect())
     }
 
     pub fn has_bound_vars(&self) -> bool {
-        self.0.into_iter().any(|typ| typ.has_bound_vars())
+        self.0.iter().any(|typ| typ.has_bound_vars())
     }
 
     pub fn occurs(&self, var: &String) -> bool {
-        self.0.into_iter().any(|t| t.occurs(var))
+        self.0.iter().any(|t| t.occurs(var))
     }
     
     pub fn concretize(&self) -> TypeList {
@@ -62,5 +69,11 @@ impl TypeList {
 impl From<Vec<Type>> for TypeList {
     fn from(value: Vec<Type>) -> Self {
         TypeList(value)
+    }
+}
+
+impl Display for TypeList {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
     }
 }

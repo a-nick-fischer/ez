@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use crate::error::TErr;
+use crate::error::Error;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SignatureElement {
@@ -56,14 +56,16 @@ pub fn sig_lexer() -> impl Parser<char, SignatureElement, Error = Simple<char>> 
     })
 }
 
-pub fn lex_sig(src: &str) -> Result<SignatureElement, TErr> {
+pub fn lex_sig(src: &str) -> Result<SignatureElement, Vec<Error>> {
     let (result, errs) = sig_lexer().parse_recovery_verbose(src.to_string());
 
     match result {
         Some(SignatureElement::Function(_, _)) => Ok(result.unwrap()),
 
-        Some(_) => panic!("Not a function"), // Change to error later
+        Some(_) => panic!("Not a function"), // TODO Change to error later
 
-        None => Err(errs)
+        None => Err(errs.into_iter()
+                .map(|err| Error::LexerError { inner: err })
+                .collect())
     }
 }

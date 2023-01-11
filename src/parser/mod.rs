@@ -1,15 +1,16 @@
 mod signature_parser;
 mod node;
-mod types;
+pub mod types;
 
-use crate::{lexer::token::Token, error::TErr};
+use crate::{lexer::token::Token, error::Error};
 
 use self::{node::Node, types::{*, type_env::TypeEnv, typelist::TypeList, types::Type}, signature_parser::parse_signature};
 
-pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, TErr> {
-    let typed_stack = Vec::new();
+pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Error> {
+    let mut typed_stack = Vec::new();
+    let mut tokens = tokens.clone();
 
-    let apply = |node: Node| {
+    let apply = |node: Node, type_env: &mut TypeEnv, typed_stack: &mut Vec<Node>| {
         node.apply(type_env);
         typed_stack.push(node);
     };
@@ -17,69 +18,79 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, TE
     while !tokens.is_empty() {
         let token = tokens.pop().unwrap();
 
-        match token {
+        match token.clone() {
             Token::Number { .. } => apply(
-                Node::Literal { typ: number_type(), token }
+                Node::Literal { typ: number_type(), token },
+                type_env,
+                &mut typed_stack
             ),
             
             Token::Quote { .. } => apply(
-                Node::Literal { typ: quote_type(), token }
+                Node::Literal { typ: quote_type(), token },
+                type_env,
+                &mut typed_stack
             ),
             
-            Token::Ident { value, .. } => {
-                let typ = type_env.bindings.get(&value).unwrap(); // TODO error handling
+            Token::Ident { ref value, .. } => {
+                let typ = type_env.bindings.get(value)
+                    .ok_or_else(|| Error::VariableNotFound { token })?;
 
                 let node = if let Some((args, ret)) = typ.extract_function() {
                     Node::Call { 
-                        name: value, 
+                        name: value.clone(), 
                         token,
                         arguments: args,
                         returns: ret 
                     }
                 }
                 else {
-                    Node::Variable { name: value, token, typ: typ.clone() }
+                    Node::Variable { name: value.clone(), token, typ: typ.clone() }
                 };
 
-                apply(node);
+                apply(node, type_env, &mut typed_stack);
             },
             
-            Token::GetIdent { value, .. } => {
-                let typ = type_env.bindings.get(&value).unwrap(); // TODO error handling
+            Token::GetIdent { ref value, .. } => {
+                let typ = type_env.bindings.get(value)
+                    .ok_or_else(|| Error::VariableNotFound { token })?;
 
-                let node = Node::Variable { name: value, token, typ: typ.clone() };
+                let node = Node::Variable { name: value.clone(), token, typ: typ.clone() };
 
-                apply(node);
+                apply(node, type_env, &mut typed_stack);
             },
 
-            Token::Assigment { value, .. } => {
+            Token::Assigment { ref value, .. } => {
                 if let Some(val) = type_env.stack.pop() {
-                    let node = Node::Assigment { name: value, token: token, typ: val };
+                    let node = Node::Assigment { name: value.clone(), token, typ: val };
 
-                    apply(node);
+                    apply(node, type_env, &mut typed_stack);
                 }
                 else {
-                    panic!() // TODO Error handling
+                    return Err(Error::AssigmentEmptyStack { token })
                 }
             },
 
-            Token::List { value, .. } if value.is_empty() => apply(
-                Node::Literal { typ: var_type("a", None), token }
+            Token::List { ref value, .. } if value.is_empty() => apply(
+                Node::Literal { typ: var_type("a", None), token },
+                type_env,
+                &mut typed_stack
             ),
 
-            Token::List { value, .. } => {
-                let new_env = type_env.clone();
+            Token::List { ref value, .. } => {
+                let mut new_env = type_env.clone();
                 new_env.stack.clear();
 
-                parse(value, &mut new_env)?;
+                parse(value.clone(), &mut new_env)?;
                 
                 match typecheck_list(&new_env.stack) {
                     Ok(typ) => apply(
-                        Node::Literal { typ: list_type(typ), token }
+                        Node::Literal { typ: list_type(typ), token },
+                        type_env,
+                        &mut typed_stack
                     ),
 
-                    Err(wrong_typ) => {
-                        panic!() // TODO Errorhandling
+                    Err((expected, got)) => {
+                        return Err(Error::WrongTypeInList { token, expected, got });
                     },
                 }                
             },
@@ -87,14 +98,16 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, TE
             Token::Function { sig, body, .. } => {
                 let (args, ret) = parse_signature(sig);
 
-                let new_env = type_env.clone();
+                let mut new_env = type_env.clone();
                 new_env.stack = args;
 
                 // Typecheck args
                 parse(body, &mut new_env)?;
 
                 // Typecheck return
-                typecheck_func_return(ret, &mut new_env)                
+                typecheck_func_return(token, ret, &mut new_env)?;
+                
+                // TODO apply()
             },
 
             Token::Newline => unreachable!(),
@@ -104,7 +117,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, TE
     Ok(typed_stack)
 }
 
-fn typecheck_list(list: &TypeList) -> Result<Type, Type> {
+fn typecheck_list(list: &TypeList) -> Result<Type, (Type, Type)> {
     if list.is_empty() { 
         return Ok(var_type("a", None)); 
     }
@@ -117,29 +130,32 @@ fn typecheck_list(list: &TypeList) -> Result<Type, Type> {
 
     for elem in list.vec() {
         if elem != &first {
-            return Err(elem.clone())
+            return Err((first, elem.clone()))
         }
     }
 
     Ok(first)
 }
 
-fn typecheck_func_return(results: TypeList, new_env: &mut TypeEnv) {
+fn typecheck_func_return(token: Token, results: TypeList, new_env: &mut TypeEnv) -> Result<(), Error> {
     if new_env.stack.len() != results.len() {
-        panic!() // TODO Error handling
+        return Err(Error::IncompatibleFunctionReturn {  token, expected: results, got: new_env.clone().stack });
     }
 
     let env_clone = new_env.clone();
     let res = results.vec();
 
     for i in (0..res.len()).rev() {
-        let stack_args = &new_env.stack.pop().unwrap().refresh_vars(&mut new_env);
+        let stack_args = &new_env.stack.pop().unwrap().refresh_vars(new_env);
 
-        res[i].unify(stack_args).unwrap(); // TODO Error handling
+        res[i].unify(stack_args)
+            .map_err(|msg| Error::UnificationError { token, msg })?;
     }
 
     // TODO Why is this necessary?
     if results.has_bound_vars() || env_clone.stack.has_bound_vars() {
-        panic!(); // TODO Error handling
+        return Err(Error::IncompatibleFunctionReturn {  token, expected: results, got: new_env.clone().stack });
     }
+
+    Ok(())
 }

@@ -1,16 +1,24 @@
 [package]
 name = "ez"
+description = "A small, stack-based, statically-typed programming language"
 version = "0.1.0"
 edition = "2021"
+authors = ["Nick Fischer <fischer-nick@outlook.com>"]
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 chumsky = "0.8.0"
 ariadne = "0.1.5"
-clap = "3.2.17"
+clap = { version = "4.1.1", features = ["derive", "cargo"] }
 rustyline = "10.0.0"
 rustyline-derive = "0.7.0"
-yansi = "0.5"
+yansi = "0.5.1"
 rand = "0.8.5"
 lazy_static = "1.4.0"
+cranelift = "0.91.0"
+cranelift-jit = "0.91.0"
+cranelift-object = "0.91.0"
+cranelift-module = "0.91.0"
+cranelift-native = "0.91.0"

@@ -16,35 +16,35 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
     };
     
     while !tokens.is_empty() {
-        let token = tokens.pop().unwrap();
+        let ref token = tokens.pop().unwrap();
 
         match token.clone() {
             Token::Number { .. } => apply(
-                Node::Literal { typ: number_type(), token },
+                Node::Literal { typ: number_type(), token: token.clone() },
                 type_env,
                 &mut typed_stack
             ),
             
             Token::Quote { .. } => apply(
-                Node::Literal { typ: quote_type(), token },
+                Node::Literal { typ: quote_type(), token: token.clone() },
                 type_env,
                 &mut typed_stack
             ),
             
             Token::Ident { ref value, .. } => {
                 let typ = type_env.bindings.get(value)
-                    .ok_or_else(|| Error::VariableNotFound { token })?;
+                    .ok_or_else(|| Error::VariableNotFound { token: token.clone() })?;
 
                 let node = if let Some((args, ret)) = typ.extract_function() {
                     Node::Call { 
                         name: value.clone(), 
-                        token,
+                        token: token.clone(),
                         arguments: args,
                         returns: ret 
                     }
                 }
                 else {
-                    Node::Variable { name: value.clone(), token, typ: typ.clone() }
+                    Node::Variable { name: value.clone(), token: token.clone(), typ: typ.clone() }
                 };
 
                 apply(node, type_env, &mut typed_stack);
@@ -52,26 +52,26 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
             
             Token::GetIdent { ref value, .. } => {
                 let typ = type_env.bindings.get(value)
-                    .ok_or_else(|| Error::VariableNotFound { token })?;
+                    .ok_or_else(|| Error::VariableNotFound { token: token.clone() })?;
 
-                let node = Node::Variable { name: value.clone(), token, typ: typ.clone() };
+                let node = Node::Variable { name: value.clone(), token: token.clone(), typ: typ.clone() };
 
                 apply(node, type_env, &mut typed_stack);
             },
 
             Token::Assigment { ref value, .. } => {
                 if let Some(val) = type_env.stack.pop() {
-                    let node = Node::Assigment { name: value.clone(), token, typ: val };
+                    let node = Node::Assigment { name: value.clone(), token: token.clone(), typ: val };
 
                     apply(node, type_env, &mut typed_stack);
                 }
                 else {
-                    return Err(Error::AssigmentEmptyStack { token })
+                    return Err(Error::AssigmentEmptyStack { token: token.clone() })
                 }
             },
 
             Token::List { ref value, .. } if value.is_empty() => apply(
-                Node::Literal { typ: var_type("a", None), token },
+                Node::Literal { typ: var_type("a", None), token: token.clone() },
                 type_env,
                 &mut typed_stack
             ),
@@ -84,13 +84,13 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                 
                 match typecheck_list(&new_env.stack) {
                     Ok(typ) => apply(
-                        Node::Literal { typ: list_type(typ), token },
+                        Node::Literal { typ: list_type(typ), token: token.clone() },
                         type_env,
                         &mut typed_stack
                     ),
 
                     Err((expected, got)) => {
-                        return Err(Error::WrongTypeInList { token, expected, got });
+                        return Err(Error::WrongTypeInList { token: token.clone(), expected, got });
                     },
                 }                
             },
@@ -137,9 +137,9 @@ fn typecheck_list(list: &TypeList) -> Result<Type, (Type, Type)> {
     Ok(first)
 }
 
-fn typecheck_func_return(token: Token, results: TypeList, new_env: &mut TypeEnv) -> Result<(), Error> {
+fn typecheck_func_return(token: &Token, results: TypeList, new_env: &mut TypeEnv) -> Result<(), Error> {
     if new_env.stack.len() != results.len() {
-        return Err(Error::IncompatibleFunctionReturn {  token, expected: results, got: new_env.clone().stack });
+        return Err(Error::IncompatibleFunctionReturn {  token: token.clone(), expected: results, got: new_env.clone().stack });
     }
 
     let env_clone = new_env.clone();
@@ -149,12 +149,12 @@ fn typecheck_func_return(token: Token, results: TypeList, new_env: &mut TypeEnv)
         let stack_args = &new_env.stack.pop().unwrap().refresh_vars(new_env);
 
         res[i].unify(stack_args)
-            .map_err(|msg| Error::UnificationError { token, msg })?;
+            .map_err(|msg| Error::UnificationError { token: token.clone(), msg })?;
     }
 
     // TODO Why is this necessary?
     if results.has_bound_vars() || env_clone.stack.has_bound_vars() {
-        return Err(Error::IncompatibleFunctionReturn {  token, expected: results, got: new_env.clone().stack });
+        return Err(Error::IncompatibleFunctionReturn { token: token.clone(), expected: results, got: new_env.clone().stack });
     }
 
     Ok(())

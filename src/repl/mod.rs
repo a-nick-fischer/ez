@@ -15,7 +15,7 @@ use crate::parser::types::type_env::TypeEnv;
 
 const HISTORY_FILE_PATH: &str = ".why_history";
 
-pub fn repl() {
+pub fn start() {
     let type_env = &mut TypeEnv::new(&HashMap::new());    
 
     let helper = ReplHelper::new();

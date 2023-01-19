@@ -4,15 +4,13 @@ use cranelift::{prelude::{*, settings::Flags}, codegen::Context};
 use cranelift_module::DataContext;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::types::type_env::TypeEnv, Config};
+use crate::{parser::{types::type_env::TypeEnv, parse}, Config, lexer::lex};
+
+use super::Translator;
 
 
 pub struct Compiler {
-    builder_context: FunctionBuilderContext,
-
-    ctx: codegen::Context,
-
-    data_ctx: DataContext,
+    translator: Translator,
 
     module: ObjectModule,
 
@@ -40,16 +38,32 @@ impl Compiler {
         let module = ObjectModule::new(builder.unwrap());
 
         Self {
-            builder_context: FunctionBuilderContext::new(),
-            ctx: Context::new(),
-            data_ctx: DataContext::new(),
-            module,
-            type_env: TypeEnv::new(&HashMap::new()) // TODO Change once we have a standard library
+            translator: Translator { 
+                builder_context: FunctionBuilderContext::new(),
+                ctx: Context::new(),
+                data_ctx: DataContext::new(),
+                module: Box::new(module),
+                naming_idx: 0,
+            },
+
+            type_env: TypeEnv::new(&HashMap::new()),
+            module, // TODO Change once we have a standard library
         }
     }
 
     pub fn compile_file<P: AsRef<Path>>(&mut self, file: P, config: &Config){
-        let src = fs::read_to_string(file);
+        let src = fs::read_to_string(file)
+            .unwrap(); // TODO Error handling
         
+        let tokens = lex(src.as_str()) // TODO Why &str?
+            .unwrap(); // TODO Error handling
+
+        let ast = parse(tokens, &mut self.type_env)
+            .unwrap(); // TODO Error handling
+
+        self.translator.translate(ast)
+            .unwrap(); // TODO Error handling
+
+        let result = self.module.finish(); // TODO How to entrypoint?
     }
 }

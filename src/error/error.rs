@@ -6,6 +6,7 @@ use yansi::Paint;
 
 use crate::{lexer::token::Token, parser::types::{typelist::TypeList, types::Type}};
 
+#[derive(Debug)]
 pub enum Error {
     LexerError { 
         inner: Simple<char> 

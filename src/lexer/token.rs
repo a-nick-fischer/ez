@@ -5,7 +5,7 @@ use super::sig_lexer::SignatureElement;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Number { value: f32, range: Range<usize> },
+    Number { value: f64, range: Range<usize> },
     Quote { value: String, range: Range<usize> },
     Ident { value: String, range: Range<usize> },
     GetIdent { value: String, range: Range<usize> },

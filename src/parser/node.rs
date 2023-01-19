@@ -7,29 +7,54 @@ pub enum Node {
     Assigment {
         name: String,
         token: Token,
-        typ: Type
+        typ: Type,
+        stack_size: usize
     },
 
     Variable {
         name: String,
         token: Token,
-        typ: Type
+        typ: Type,
+        stack_size: usize
     },
 
     Call {
         name: String,
         token: Token,
         arguments: TypeList,
-        returns: TypeList
+        returns: TypeList,
+        stack_size: usize
     },
 
     Literal {
         typ: Type,
         token: Token,
+        stack_size: usize
     }
 }
 
 impl Node {
+    pub fn stack_size_before(&self) -> usize {
+        match self {
+            Node::Assigment { stack_size, .. } |
+            Node::Variable { stack_size, .. } |
+            Node::Call { stack_size, .. } |
+            Node::Literal { stack_size, .. } => *stack_size,
+        }
+    }
+
+    pub fn stack_size_after(&self) -> usize {
+        match self {
+            Node::Assigment { stack_size, .. } => stack_size - 1,
+
+            Node::Variable { stack_size, .. } => stack_size + 1,
+            
+            Node::Call { stack_size, arguments, returns, .. } => stack_size + arguments.len() - returns.len(),
+            
+            Node::Literal { stack_size, .. } => stack_size + 1,
+        }
+    }
+
     pub fn apply(&self, env: &mut TypeEnv) -> Result<(), Error> {
         match self {
             Node::Assigment { name, typ, .. } => {
@@ -42,7 +67,7 @@ impl Node {
                 Ok(())
             },
 
-            Node::Call { name, arguments, returns, token } => {            
+            Node::Call { name, arguments, returns, token, .. } => {            
                 let arg_len = arguments.len();
                 let stack_len = env.stack.len();
             

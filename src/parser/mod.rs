@@ -20,13 +20,21 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
 
         match token.clone() {
             Token::Number { .. } => apply(
-                Node::Literal { typ: number_type(), token: token.clone() },
+                Node::Literal { 
+                    typ: number_type(), 
+                    token: token.clone(), 
+                    stack_size:  type_env.stack.len()
+                },
                 type_env,
                 &mut typed_stack
             ),
             
             Token::Quote { .. } => apply(
-                Node::Literal { typ: quote_type(), token: token.clone() },
+                Node::Literal { 
+                    typ: quote_type(), 
+                    token: token.clone(),
+                    stack_size:  type_env.stack.len()
+                },
                 type_env,
                 &mut typed_stack
             ),
@@ -40,11 +48,17 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                         name: value.clone(), 
                         token: token.clone(),
                         arguments: args,
-                        returns: ret 
+                        returns: ret,
+                        stack_size:  type_env.stack.len()
                     }
                 }
                 else {
-                    Node::Variable { name: value.clone(), token: token.clone(), typ: typ.clone() }
+                    Node::Variable { 
+                        name: value.clone(), 
+                        token: token.clone(), 
+                        typ: typ.clone(),
+                        stack_size:  type_env.stack.len()
+                    }
                 };
 
                 apply(node, type_env, &mut typed_stack);
@@ -54,14 +68,24 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                 let typ = type_env.bindings.get(value)
                     .ok_or_else(|| Error::VariableNotFound { token: token.clone() })?;
 
-                let node = Node::Variable { name: value.clone(), token: token.clone(), typ: typ.clone() };
+                let node = Node::Variable { 
+                    name: value.clone(), 
+                    token: token.clone(), 
+                    typ: typ.clone(),
+                    stack_size:  type_env.stack.len()
+                };
 
                 apply(node, type_env, &mut typed_stack);
             },
 
             Token::Assigment { ref value, .. } => {
                 if let Some(val) = type_env.stack.pop() {
-                    let node = Node::Assigment { name: value.clone(), token: token.clone(), typ: val };
+                    let node = Node::Assigment { 
+                        name: value.clone(), 
+                        token: token.clone(), 
+                        typ: val,
+                        stack_size:  type_env.stack.len()
+                    };
 
                     apply(node, type_env, &mut typed_stack);
                 }
@@ -71,7 +95,11 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
             },
 
             Token::List { ref value, .. } if value.is_empty() => apply(
-                Node::Literal { typ: var_type("a", None), token: token.clone() },
+                Node::Literal { 
+                    typ: var_type("a", None), 
+                    token: token.clone(),
+                    stack_size:  type_env.stack.len()
+                },
                 type_env,
                 &mut typed_stack
             ),
@@ -84,7 +112,11 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                 
                 match typecheck_list(&new_env.stack) {
                     Ok(typ) => apply(
-                        Node::Literal { typ: list_type(typ), token: token.clone() },
+                        Node::Literal { 
+                            typ: list_type(typ), 
+                            token: token.clone(),
+                            stack_size: type_env.stack.len()
+                        },
                         type_env,
                         &mut typed_stack
                     ),

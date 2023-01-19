@@ -22,3 +22,4 @@ cranelift-jit = "0.91.0"
 cranelift-object = "0.91.0"
 cranelift-module = "0.91.0"
 cranelift-native = "0.91.0"
+uuid = { version = "1.2.2", features = [ "v4", "fast-rng" ] }

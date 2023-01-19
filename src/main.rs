@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 
 use clap::{Parser, command, Subcommand};
-use compiler::Compiler;
-use jit::Jit;
+use codegen::compiler::Compiler;
+use codegen::jit::Jit;
 
 mod lexer;
 mod error;
 mod parser;
 mod repl;
-mod jit;
-mod compiler;
+mod codegen;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

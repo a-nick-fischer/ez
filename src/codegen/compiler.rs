@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path, fs};
 
 use cranelift::{prelude::{*, settings::Flags}, codegen::Context};
 use cranelift_module::DataContext;
@@ -49,6 +49,7 @@ impl Compiler {
     }
 
     pub fn compile_file<P: AsRef<Path>>(&mut self, file: P, config: &Config){
-
+        let src = fs::read_to_string(file);
+        
     }
 }

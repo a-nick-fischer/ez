@@ -1,5 +1,5 @@
 mod signature_parser;
-mod node;
+pub mod node;
 pub mod types;
 
 use crate::{lexer::token::Token, error::Error};
@@ -118,23 +118,22 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
 }
 
 fn typecheck_list(list: &TypeList) -> Result<Type, (Type, Type)> {
-    if list.is_empty() { 
-        return Ok(var_type("a", None)); 
-    }
+    // benjamin verifiziert
+    match &list.vec()[..] {
+        [] => Ok(var_type("a", None)),
 
-    let first = list.vec().get(0).unwrap().clone();
+        [one] => Ok(one.clone()),
 
-    if list.len() == 1 {
-        return Ok(first)
-    }
+        [first, ..]  => {
+            for elem in list.vec() {
+                if elem != first {
+                    return Err((first.clone(), elem.clone()))
+                }
+            }
 
-    for elem in list.vec() {
-        if elem != &first {
-            return Err((first, elem.clone()))
+            Ok(first.clone())
         }
     }
-
-    Ok(first)
 }
 
 fn typecheck_func_return(token: &Token, results: TypeList, new_env: &mut TypeEnv) -> Result<(), Error> {

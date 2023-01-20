@@ -7,8 +7,7 @@ use cranelift_object::{ObjectModule, ObjectBuilder};
 
 use crate::{parser::{types::type_env::TypeEnv, parse}, Config, lexer::lex, error::{Error, report_errors}};
 
-use super::Translator;
-
+use super::translator::Translator;
 pub struct Compiler {
     translator: Translator<ObjectModule>,
 
@@ -50,10 +49,10 @@ impl Compiler {
 
     pub fn compile_file<P: AsRef<Path>>(&mut self, file: P, config: &Config) {
         let result = fs::read_to_string(file)
-            .map_err(|err| 
+            .map_err(|err|
                 (vec![Error::GeneralError { message: err.to_string() }], "".to_owned()))
             .and_then(|src| 
-                self.compile(src, &config)
+                self.compile(src.clone(), &config)
                     .map_err(|errs| (errs, src)));
 
         match result {

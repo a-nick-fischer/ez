@@ -28,9 +28,21 @@ pub enum Node {
 
     Literal {
         typ: Type,
+        value: Literal,
         token: Token,
         stack_size: usize
     }
+}
+
+#[derive(Clone, Debug)]
+pub enum Literal {
+    Quote(String),
+
+    Number(f64),
+
+    List(Vec<Node>),
+
+    Function(Vec<Node>)
 }
 
 impl Node {

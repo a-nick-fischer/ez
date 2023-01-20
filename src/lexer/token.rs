@@ -36,19 +36,3 @@ impl Token {
         }
     }
 }
-
-impl fmt::Display for Token {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::Number { value, .. } => write!(f, "{value}"),
-
-            Self::Quote { value, .. } => write!(f, "{value}"),
-            
-            Self::Ident { value, .. } => write!(f, "'{value}'"),
-            
-            //Self::List(a) => write!(f, "[{a}]"),
-            
-            _ => unimplemented!()
-        }
-    }
-}

@@ -4,7 +4,7 @@ pub mod types;
 
 use crate::{lexer::token::Token, error::Error};
 
-use self::{node::Node, types::{*, type_env::TypeEnv, typelist::TypeList, types::Type}, signature_parser::parse_signature};
+use self::{node::{Node, Literal}, types::{*, type_env::TypeEnv, typelist::TypeList, types::Type}, signature_parser::parse_signature};
 
 pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Vec<Error>> {
     let mut typed_stack = Vec::new();
@@ -19,20 +19,22 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Ve
         let ref token = tokens.pop().unwrap();
 
         match token.clone() {
-            Token::Number { .. } => apply(
+            Token::Number { value, .. } => apply(
                 Node::Literal { 
                     typ: number_type(), 
                     token: token.clone(), 
+                    value: Literal::Number(value),
                     stack_size:  type_env.stack.len()
                 },
                 type_env,
                 &mut typed_stack
             ),
             
-            Token::Quote { .. } => apply(
+            Token::Quote { value, .. } => apply(
                 Node::Literal { 
                     typ: quote_type(), 
                     token: token.clone(),
+                    value: Literal::Quote(value),
                     stack_size:  type_env.stack.len()
                 },
                 type_env,
@@ -96,7 +98,8 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Ve
 
             Token::List { ref value, .. } if value.is_empty() => apply(
                 Node::Literal { 
-                    typ: var_type("a", None), 
+                    typ: var_type("a", None),
+                    value: Literal::List(Vec::new()),
                     token: token.clone(),
                     stack_size:  type_env.stack.len()
                 },
@@ -108,13 +111,14 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Ve
                 let mut new_env = type_env.clone();
                 new_env.stack.clear();
 
-                parse(value.clone(), &mut new_env)?;
+                let ast = parse(value.clone(), &mut new_env)?;
                 
                 match typecheck_list(&new_env.stack) {
                     Ok(typ) => apply(
                         Node::Literal { 
                             typ: list_type(typ), 
                             token: token.clone(),
+                            value: Literal::List(ast),
                             stack_size: type_env.stack.len()
                         },
                         type_env,
@@ -131,16 +135,26 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Ve
                 let (args, ret) = parse_signature(sig);
 
                 let mut new_env = type_env.clone();
-                new_env.stack = args;
+                new_env.stack = args.clone();
 
                 // Typecheck args
-                parse(body, &mut new_env)?;
+                let ast = parse(body, &mut new_env)?;
 
                 // Typecheck return
-                typecheck_func_return(token, ret, &mut new_env)
+                typecheck_func_return(token, ret.clone(), &mut new_env)
                     .map_err(|err| vec![err])?;
+
+                let node = Node::Literal { 
+                    typ: func_type(
+                        args.vec().clone(), 
+                        ret.vec().clone()
+                    ),
+                    value: Literal::Function(ast),
+                    token: token.clone(), 
+                    stack_size: type_env.stack.len()
+                };
                 
-                // TODO apply()
+                apply(node, type_env, &mut typed_stack);
             },
 
             Token::Newline => unreachable!(),

@@ -2,31 +2,33 @@ use std::collections::HashMap;
 
 use cranelift::prelude::*;
 use cranelift::{codegen, prelude::{FunctionBuilderContext, FunctionBuilder, InstBuilder}};
-use cranelift_module::{Module, DataContext, Linkage, DataId, FuncId, FuncOrDataId};
+use cranelift_module::{Module, DataContext, Linkage, DataId, FuncId, FuncOrDataId, ModuleError};
+use cranelift_object::ObjectModule;
 
+use crate::error::Error;
 use crate::{parser::{node::Node, types::{types::Type, *}}, lexer::token::Token};
 
 pub mod compiler;
 pub mod jit;
 
-struct Translator {
+struct Translator<M: Module> {
     builder_context: FunctionBuilderContext,
 
     ctx: codegen::Context,
 
     data_ctx: DataContext,
 
-    module: Box<dyn Module>,
+    module: M,
 
     naming_idx: u32
 }
 
-impl Translator {
-    fn translate(&mut self, nodes: Vec<Node>) -> Result<FuncId, ()> {
-        let tran = FunctionTranslator::new(&mut self);
+impl<M: Module> Translator<M> {
+    fn translate(&mut self, nodes: Vec<Node>) -> Result<FuncId, Vec<Error>> {
+        let mut tran = FunctionTranslator::new(self);
         
         for node in nodes {
-            tran.translate_node(node);
+            tran.translate_node(node)?;
         }
 
         let sig = self.module.make_signature();
@@ -34,42 +36,42 @@ impl Translator {
         let id = self
             .module
             .declare_anonymous_function(&sig)
-            .unwrap(); // TODO Error handling
+            .map_err(|err| vec![err.into()])?;
 
         self.module
             .define_function(id, &mut self.ctx)
-            .unwrap(); // TODO Error handling
+            .map_err(|err| vec![err.into()])?;
 
-        id
+        Ok(id)
     }
 
-    fn create_data(&mut self, name: String, content: Vec<u8>) -> DataId {
+    fn create_data(&mut self, name: String, content: Vec<u8>) -> Result<DataId, Vec<Error>> {
         self.data_ctx.define(content.into_boxed_slice());
 
         let id = self
             .module
             .declare_data(&name, Linkage::Export, true, false)
-            .unwrap(); // TODO Error handling
+            .map_err(|err| vec![err.into()])?;
 
         self.module
             .define_data(id, &self.data_ctx)
-            .unwrap(); // TODO Error handling
+            .map_err(|err| vec![err.into()])?;
 
-        self.data_ctx.clear(); // TODO Needed?
+        // self.data_ctx.clear(); // TODO Needed?
 
-        id
+        Ok(id)
     }
 
-    fn get_func_by_name(&self, name: &str) -> FuncId {
+    fn get_func_by_name(&self, name: &str) -> Result<FuncId, Vec<Error>> {
         let maybe_func = self
             .module
             .declarations()
             .get_name(name);
 
         match maybe_func {
-            Some(FuncOrDataId::Func(id)) => id,
+            Some(FuncOrDataId::Func(id)) => Ok(id),
 
-            _ => panic!("Replace me with an error"), // TODO Error handling
+            _ => Err(error(format!("{name} not a function - yes this is a compiler bug"))),
         }
     }
 
@@ -90,40 +92,46 @@ impl Translator {
         let callee = self
             .module
             .declare_function("malloc", Linkage::Import, &sig)
-            .expect("problem declaring function"); // TODO Error handling
+            .expect("problem declaring function"); // TODO Error handling or move to STDLIB
     }
 }
 
-struct FunctionTranslator<'a> {
+struct FunctionTranslator<'a, M: Module> {
     builder: FunctionBuilder<'a>,
 
-    parent: &'a mut Translator,
+    parent: &'a mut Translator<M>,
 
-    variables: HashMap<String, Variable>
+    variables: HashMap<String, Variable>,
+
+    stack: Vec<Value>
 }
 
-impl<'a> FunctionTranslator<'a> {
-    fn new(parent: &'a mut Translator) -> Self {
+impl<'a, M: Module> FunctionTranslator<'a, M> {
+    fn new(parent: &'a mut Translator<M>) -> Self {
         FunctionTranslator { 
             builder: FunctionBuilder::new(&mut parent.ctx.func, &mut parent.builder_context), 
             parent,
-            variables: HashMap::new() 
+            variables: HashMap::new(),
+            stack: Vec::new()
         }
     }
 
-    fn translate_node(&mut self, node: Node) {
+    fn translate_node(&mut self, node: Node) -> Result<(), Vec<Error>> {
         match node {
             Node::Assigment { name, typ, .. } => {
                 let var = Variable::new(self.variables.len());
                 self.variables.insert(name, var);
 
-                self.builder.def_var(var, todo!()); // TODO 
+                let content = self.stack.pop().unwrap();
+                self.builder.def_var(var, content);
             },
     
             Node::Variable { name, typ, .. } => {
-                let var = self.variables.get(&name).unwrap(); // TODO Error handling
-                self.builder.use_var(*var);
-                // TODO Push on stack
+                let var = self.variables.get(&name)
+                    .ok_or(error(format!("Variable {name} not found - yes this is a compiler bug")))?;
+
+                let val = self.builder.use_var(*var);
+                self.stack.push(val);
             },
     
             Node::Call { name, arguments, returns, .. } => {
@@ -137,30 +145,37 @@ impl<'a> FunctionTranslator<'a> {
                     sig.returns.push(AbiParam::new((*ret).into()))
                 }
 
-                let func = self.parent.get_func_by_name(name.as_str());
+                let func = self.parent.get_func_by_name(name.as_str())?;
 
                 let local_callee = self
                     .parent
                     .module
                     .declare_func_in_func(func, self.builder.func);
 
-                self.builder.call(local_callee, todo!()); // TODO Error handling
+                let slice = &self.stack[arguments.len()..];
+                let inst = self.builder.ins().call(local_callee, slice);
+
+                let returns = self.builder.inst_results(inst);
+                self.stack.extend_from_slice(returns);
             },
     
             Node::Literal { typ, token, .. } => {
-                self.build_literal(typ, token);
-                 // TODO Push on stack
+                let val = self.build_literal(typ, token)?;
+                self.stack.push(val);
             }
         }
+
+        Ok(())
     }
 
-    fn build_literal(&mut self, typ: Type, token: Token) -> Value {
+    fn build_literal(&mut self, typ: Type, token: Token) -> Result<Value, Vec<Error>> {
         if let Type::Kind(typ_name, _type_vars) = typ {
             match (typ_name.as_str(), token) {
                 (QUOTE_TYPE_NAME, Token::Quote { value, .. }) => {
                     let id = self.parent.create_data(
-                        self.parent.gen_name(), 
-                        value.as_bytes().to_vec());
+                        self.parent.gen_name(),
+                        value.as_bytes().to_vec()
+                    )?;
 
                     let local_id = self
                         .parent
@@ -168,13 +183,13 @@ impl<'a> FunctionTranslator<'a> {
                         .declare_data_in_func(id, self.builder.func);
 
                     let pointer = self.parent.pointer_type();
-                    self.builder.ins().symbol_value(pointer, local_id)
+                    Ok(self.builder.ins().symbol_value(pointer, local_id))
                 },
     
                 (NUMBER_TYPE_NAME, Token::Number { value, .. }) => {
-                    self.builder.ins().f64const(value)
+                    Ok(self.builder.ins().f64const(value))
                 },
-    
+
                 (LIST_TYPE_NAME, Token::List { value, .. }) => {
                     todo!()
                 },
@@ -190,8 +205,8 @@ impl<'a> FunctionTranslator<'a> {
         else { unreachable!() }
     }
 
-    fn ins_malloc(&mut self, size: Value, builder: &mut FunctionBuilder) -> Value {
-        let malloc = self.parent.get_func_by_name("malloc");
+    fn ins_malloc(&mut self, size: Value, builder: &mut FunctionBuilder) -> Result<Value, Vec<Error>> {
+        let malloc = self.parent.get_func_by_name("malloc")?;
         
         let local_callee = self
             .parent
@@ -199,10 +214,9 @@ impl<'a> FunctionTranslator<'a> {
             .declare_func_in_func(malloc, &mut builder.func);
 
         let call = builder.ins().call(local_callee, &[size]);
-        builder.inst_results(call)[0]
+        Ok(builder.inst_results(call)[0])
     }
 }
-
 
 impl Into<cranelift::prelude::Type> for Type {
     fn into(self) -> cranelift::prelude::Type {
@@ -219,5 +233,15 @@ impl Into<cranelift::prelude::Type> for Type {
 
             Type::Variable(_, _) => panic!("Variables not allowed"),
         }
+    }
+}
+
+fn error(message: String) -> Vec<Error> {
+    vec![Error::GeneralError { message }]
+}
+
+impl From<ModuleError> for Error {
+    fn from(value: ModuleError) -> Self {
+        Error::GeneralError { message: value.to_string() }
     }
 }

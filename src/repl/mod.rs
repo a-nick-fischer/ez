@@ -35,15 +35,15 @@ pub fn start() {
         let readline = rl.readline(&p);
 
         match readline {
-            Ok(line) => {
+            Ok(ref line) => {
                 rl.add_history_entry(line.as_str());
                 
-                let res = lex(line.as_str())
-                    .and_then(|tokens| parse(tokens, type_env).map_err(|e| vec![e]));
+                let res = lex(line.clone())
+                    .and_then(|tokens| parse(tokens, type_env));
 
                 match res {
                     Ok(nodes) => println!("{nodes:?}"),
-                    Err(errs) => report_errors(line, errs),
+                    Err(errs) => report_errors(line.clone(), errs),
                 }
             },
 

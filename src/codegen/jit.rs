@@ -18,7 +18,6 @@ pub struct Jit {
     type_env: TypeEnv
 }
 
-
 impl Jit {
     pub fn new() -> Self {
         let builder = JITBuilder::new(cranelift_module::default_libcall_names());

@@ -12,6 +12,10 @@ pub enum Error {
         inner: Simple<char> 
     },
 
+    GeneralError {
+        message: String,
+    },
+
     VariableNotFound {
         token: Token
     },
@@ -42,13 +46,15 @@ pub enum Error {
         token: Token,
         expected: TypeList,
         got: TypeList
-    }
+    },
 }
 
 impl Error {
     pub fn report(&self) -> Report {
         match self {
             Error::LexerError { inner } => lexer_error_report(inner).finish(),
+
+            Error::GeneralError { message } => message_error_report(message.clone()).finish(),
 
             Error::VariableNotFound { token: Token::Ident { value, range } } => simple_error_report(
                 range.clone(), 
@@ -123,6 +129,11 @@ impl Error {
             _ => unimplemented!()
         }
     }
+}
+
+fn message_error_report(msg: String) -> ReportBuilder<Range<usize>> {
+    Report::build(ReportKind::Error, (), 0)
+        .with_message(msg)
 }
 
 fn simple_error_report(range: Range<usize>, msg: String, label: String) -> ReportBuilder<Range<usize>> {

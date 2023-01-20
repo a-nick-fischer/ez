@@ -6,7 +6,7 @@ use crate::{lexer::token::Token, error::Error};
 
 use self::{node::Node, types::{*, type_env::TypeEnv, typelist::TypeList, types::Type}, signature_parser::parse_signature};
 
-pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Error> {
+pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Vec<Error>> {
     let mut typed_stack = Vec::new();
     let mut tokens = tokens.clone();
 
@@ -41,7 +41,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
             
             Token::Ident { ref value, .. } => {
                 let typ = type_env.bindings.get(value)
-                    .ok_or_else(|| Error::VariableNotFound { token: token.clone() })?;
+                    .ok_or_else(|| vec![Error::VariableNotFound { token: token.clone() }])?;
 
                 let node = if let Some((args, ret)) = typ.extract_function() {
                     Node::Call { 
@@ -66,7 +66,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
             
             Token::GetIdent { ref value, .. } => {
                 let typ = type_env.bindings.get(value)
-                    .ok_or_else(|| Error::VariableNotFound { token: token.clone() })?;
+                    .ok_or_else(|| vec![Error::VariableNotFound { token: token.clone() }])?;
 
                 let node = Node::Variable { 
                     name: value.clone(), 
@@ -90,7 +90,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                     apply(node, type_env, &mut typed_stack);
                 }
                 else {
-                    return Err(Error::AssigmentEmptyStack { token: token.clone() })
+                    return Err(vec![Error::AssigmentEmptyStack { token: token.clone() }])
                 }
             },
 
@@ -122,7 +122,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                     ),
 
                     Err((expected, got)) => {
-                        return Err(Error::WrongTypeInList { token: token.clone(), expected, got });
+                        return Err(vec![Error::WrongTypeInList { token: token.clone(), expected, got }]);
                     },
                 }                
             },
@@ -137,7 +137,8 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                 parse(body, &mut new_env)?;
 
                 // Typecheck return
-                typecheck_func_return(token, ret, &mut new_env)?;
+                typecheck_func_return(token, ret, &mut new_env)
+                    .map_err(|err| vec![err])?;
                 
                 // TODO apply()
             },

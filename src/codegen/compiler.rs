@@ -1,18 +1,16 @@
 use std::{collections::HashMap, path::Path, fs};
 
+use ariadne::{Fmt, Color};
 use cranelift::{prelude::{*, settings::Flags}, codegen::Context};
 use cranelift_module::DataContext;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::{types::type_env::TypeEnv, parse}, Config, lexer::lex};
+use crate::{parser::{types::type_env::TypeEnv, parse}, Config, lexer::lex, error::{Error, report_errors}};
 
 use super::Translator;
 
-
 pub struct Compiler {
-    translator: Translator,
-
-    module: ObjectModule,
+    translator: Translator<ObjectModule>,
 
     type_env: TypeEnv
 }
@@ -42,28 +40,46 @@ impl Compiler {
                 builder_context: FunctionBuilderContext::new(),
                 ctx: Context::new(),
                 data_ctx: DataContext::new(),
-                module: Box::new(module),
+                module,
                 naming_idx: 0,
             },
 
-            type_env: TypeEnv::new(&HashMap::new()),
-            module, // TODO Change once we have a standard library
+            type_env: TypeEnv::new(&HashMap::new()), // TODO Change once we have a standard library
         }
     }
 
-    pub fn compile_file<P: AsRef<Path>>(&mut self, file: P, config: &Config){
-        let src = fs::read_to_string(file)
-            .unwrap(); // TODO Error handling
-        
-        let tokens = lex(src.as_str()) // TODO Why &str?
-            .unwrap(); // TODO Error handling
+    pub fn compile_file<P: AsRef<Path>>(&mut self, file: P, config: &Config) {
+        let result = fs::read_to_string(file)
+            .map_err(|err| 
+                (vec![Error::GeneralError { message: err.to_string() }], "".to_owned()))
+            .and_then(|src| 
+                self.compile(src, &config)
+                    .map_err(|errs| (errs, src)));
 
-        let ast = parse(tokens, &mut self.type_env)
-            .unwrap(); // TODO Error handling
+        match result {
+            Ok(_) => {
+                println!("\n\t{}", "Build succeeded".fg(Color::Green));
+            },
 
-        self.translator.translate(ast)
-            .unwrap(); // TODO Error handling
+            Err((errs, src)) => {
+                let len = errs.len();
+                report_errors(src, errs);
 
-        let result = self.module.finish(); // TODO How to entrypoint?
+                let msg = format!("Build failed with {} errors", len);
+                println!("\n\t{}", msg.fg(Color::Red));
+            },
+        }
     }
-}
+
+    fn compile(&mut self, src: String, config: &Config) -> Result<(), Vec<Error>> {
+        let tokens = lex(src)?;
+
+        let ast = parse(tokens, &mut self.type_env)?;
+
+        self.translator.translate(ast)?;
+
+        let result = self.translator.module.finish(); // TODO How to entrypoint?
+
+        todo!()
+    }
+} 

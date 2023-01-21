@@ -3,9 +3,21 @@ use chumsky::prelude::*;
 use crate::error::Error;
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct Signature(Vec<SignatureElement>, Vec<SignatureElement>);
+
+impl Signature {
+    pub fn get_args(&self) -> &Vec<SignatureElement> {
+        &self.0
+    }
+
+    pub fn get_returns(&self) -> &Vec<SignatureElement> {
+        &self.1
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum SignatureElement {
     Kind(String, Vec<SignatureElement>),
-    Function(Vec<SignatureElement>, Vec<SignatureElement>),
     Variable(String)
 }
 
@@ -24,45 +36,37 @@ fn ident_lexer() -> impl Parser<char, String, Error = Simple<char>> + Clone {
             .collect::<String>()
 }
 
-pub fn sig_lexer() -> impl Parser<char, SignatureElement, Error = Simple<char>> + Clone {
-    recursive(|func|{
+pub fn sig_lexer() -> impl Parser<char, Signature, Error = Simple<char>> + Clone {
+    let elem = recursive(|func|{
         let var = just('\'')
             .ignore_then(ident_lexer())
             .map(|name| SignatureElement::Variable(name));
 
-        let polytype = func.delimited_by(just('['), just(']'));
+        let polytypes = func.padded()
+            .repeated()
+            .delimited_by(just('['), just(']'));
         
         let kind = ident_lexer()
-            .then(polytype.repeated())
+            .then(polytypes)
             .map(|(name, typs)| SignatureElement::Kind(name, typs));
 
-        let elem = var.clone().or(kind.clone());
+        var.clone().or(kind.clone())
+    });
 
-        let elem_list = elem
-            .padded()
-            .repeated()
-            .delimited_by(just('('), just(')'));
+    let side = elem.padded().repeated();
 
-        let function_sig =
-            elem_list
-            .clone()
-            .padded()
-            .then_ignore(just("->"))
-            .padded()
-            .then(elem_list)
-            .map(|(a, b)| SignatureElement::Function(a, b));
-    
-        choice((function_sig, var, kind))
-    })
+    side.clone()
+        .then_ignore(just("--"))
+        .then(side)
+        .delimited_by(just("("), just(")"))
+        .map(|(args, ret)| Signature(args, ret))
 }
 
-pub fn lex_sig(src: &str) -> Result<SignatureElement, Vec<Error>> {
+pub fn lex_sig(src: &str) -> Result<Signature, Vec<Error>> {
     let (result, errs) = sig_lexer().parse_recovery_verbose(src.to_string());
 
     match result {
-        Some(SignatureElement::Function(_, _)) => Ok(result.unwrap()),
-
-        Some(_) => panic!("Not a function"), // TODO Change to error later
+        Some(sig) => Ok(sig),
 
         None => Err(errs.into_iter()
                 .map(|err| Error::LexerError { inner: err })

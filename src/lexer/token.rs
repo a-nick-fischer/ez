@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use super::sig_lexer::SignatureElement;
+use super::sig_lexer::Signature;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
@@ -10,7 +10,7 @@ pub enum Token {
     GetIdent { value: String, range: Range<usize> },
     Assigment { value: String, range: Range<usize> },
     List { value: Vec<Token>, range: Range<usize> },
-    Function { sig: SignatureElement, body: Vec<Token>, range: Range<usize> },
+    Function { sig: Signature, body: Vec<Token>, range: Range<usize> },
     Newline
 }
 

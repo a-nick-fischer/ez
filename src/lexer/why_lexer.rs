@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use super::{token::Token, sig_lexer::{SignatureElement, sig_lexer}};
+use super::{token::Token, sig_lexer::{Signature, sig_lexer}};
 
 fn ident_lexer() -> impl Parser<char, String, Error = Simple<char>> + Clone {
     let punctuation = filter(|c: &char| {
@@ -82,14 +82,8 @@ pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
         let function = sig_lexer()
             .padded()
             .then(function_body)
-            .map_with_span(|(sig, body), span| {
-                if let SignatureElement::Function(_, _) = sig {
-                    Token::Function { sig, body, range: span }
-                }
-                else {
-                    panic!("{:?} | {:?}", sig, body);
-                }
-            });
+            .map_with_span(|(sig, body), span| 
+                Token::Function { sig, body, range: span });
 
         let newline = just('\n')
             .labelled("newline")

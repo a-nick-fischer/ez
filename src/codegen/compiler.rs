@@ -56,12 +56,12 @@ impl Compiler {
 
         let compilation_result = maybe_src
             .and_then(|src| {
-                self.compile(src, output_file)
+                self.compile(src, &output_file)
                     .map_err(|err| (err, "".to_owned()))
             });
 
         let result = compilation_result
-            .and_then(|_| link(output_file, config)
+            .and_then(|_| link(&output_file, config)
                 .map_err(|err| (err, "".to_owned())));
 
         match result {
@@ -73,7 +73,7 @@ impl Compiler {
         }
     }
 
-    fn compile(&mut self, src: String, outfile: PathBuf) -> Result<(), Vec<Error>> {
+    fn compile(&mut self, src: String, outfile: &PathBuf) -> Result<(), Vec<Error>> {
         let tokens = lex(src)?;
 
         let ast = parse(tokens, &mut self.type_env)?;
@@ -86,7 +86,7 @@ impl Compiler {
             .map_err(|err| vec![error(err)])?;
 
         fs::write(outfile, bytes)
-            .map_err(|err| vec![error(err)])?;
+            .map_err(|err| vec![error(err)])
     }
 }
 

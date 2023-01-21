@@ -57,6 +57,10 @@ pub enum Commands {
         #[arg(long)]
         do_not_link: bool,
 
+        // Custom linker commands
+        #[arg(long)]
+        linker_command: String,
+
         /// Compilation target triplet, e.g. x86_64-linux-musl, x86_64-windows-unknown, etc.
         /// Please note that this is for cross-compilation only - the default compilation
         /// target is optimized for the current machine, features like SIMD-support are 
@@ -76,13 +80,13 @@ fn main() {
     let config = Config::parse();
 
     if let Some(ref path) = config.file {
-        Jit::new().run_file(path, &config);
+        Jit::new().run_file(&config);
         return
     }
 
     match config.command {
-        Some(Commands::Compile { ref input_file, .. }) =>
-            Compiler::new().compile_file(input_file, &config),
+        Some(Commands::Compile { .. }) =>
+            Compiler::new().compile_file(&config),
 
         None => 
             repl::start(),

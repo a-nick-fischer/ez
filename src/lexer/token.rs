@@ -1,4 +1,3 @@
-use core::fmt;
 use std::ops::Range;
 
 use super::sig_lexer::SignatureElement;

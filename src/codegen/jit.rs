@@ -1,4 +1,4 @@
-use std::{path::Path, collections::HashMap};
+use std::collections::HashMap;
 
 use cranelift::prelude::*;
 use cranelift_jit::{JITModule, JITBuilder};
@@ -31,8 +31,8 @@ impl Jit {
         }
     }
 
-    pub fn run_file<P: AsRef<Path>>(&mut self, file: P, config: &Config){
-
+    pub fn run_file(&mut self, config: &Config){
+        
     }
 
     pub fn run_expr(&mut self, expr: String, config: &Config){

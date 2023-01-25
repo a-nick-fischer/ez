@@ -21,7 +21,7 @@ pub struct Translator<M: Module> {
 }
 
 impl<M: Module> Translator<M> {
-    pub fn translate(&mut self, nodes: Vec<Node>) -> Result<FuncId, Vec<Error>> {
+    pub fn translate(&mut self, name: Option<&str>, nodes: Vec<Node>) -> Result<FuncId, Vec<Error>> {
         let mut tran = FunctionTranslator::new(self);
         
         for node in nodes {
@@ -29,15 +29,7 @@ impl<M: Module> Translator<M> {
         }
 
         let sig = self.module.make_signature();
-
-        let id = self
-            .module
-            .declare_anonymous_function(&sig)
-            .map_err(|err| vec![err.into()])?;
-
-        self.module
-            .define_function(id, &mut self.ctx)
-            .map_err(|err| vec![err.into()])?;
+        let id = self.create_func(name, sig)?;
 
         Ok(id)
     }
@@ -55,6 +47,28 @@ impl<M: Module> Translator<M> {
             .map_err(|err| vec![err.into()])?;
 
         // self.data_ctx.clear(); // TODO Needed?
+
+        Ok(id)
+    }
+
+    fn create_func(&mut self, maybe_name: Option<&str>, sig: Signature) -> Result<FuncId, Vec<Error>> {
+        let id = 
+            if let Some(name) = maybe_name {
+                self
+                    .module
+                    .declare_function(name, Linkage::Export, &sig)
+                    .map_err(|err| vec![err.into()])?
+            }
+            else {
+                self
+                    .module
+                    .declare_anonymous_function(&sig)
+                    .map_err(|err| vec![err.into()])?
+            };
+        
+        self.module
+            .define_function(id, &mut self.ctx)
+            .map_err(|err| vec![err.into()])?;
 
         Ok(id)
     }
@@ -193,7 +207,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                 },
     
                 (FUNC_TYPE_NAME, Literal::Function(ast)) => {
-                    let func = self.parent.translate(ast)?;
+                    let func = self.parent.translate(None, ast)?;
 
                     let local_callee = self
                         .parent
@@ -209,17 +223,17 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         }
         else { unreachable!() }
     }
-
-    fn ins_malloc(&mut self, size: Value, builder: &mut FunctionBuilder) -> Result<Value, Vec<Error>> {
+    
+    fn ins_malloc(&mut self, size: Value) -> Result<Value, Vec<Error>> {
         let malloc = self.parent.get_func_by_name("malloc")?;
         
         let local_callee = self
             .parent
             .module
-            .declare_func_in_func(malloc, &mut builder.func);
+            .declare_func_in_func(malloc, &mut self.builder.func);
 
-        let call = builder.ins().call(local_callee, &[size]);
-        Ok(builder.inst_results(call)[0])
+        let call = self.builder.ins().call(local_callee, &[size]);
+        Ok(self.builder.inst_results(call)[0])
     }
 }
 

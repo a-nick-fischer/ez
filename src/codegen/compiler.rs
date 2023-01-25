@@ -47,16 +47,16 @@ impl Compiler {
         }
     }
 
-    pub fn compile_file(&mut self, config: &Config) {
+    pub fn compile_file(self, config: &Config) {
+        // TODO MY FUCKING EYEEEEEEEEEEEEEEEEEEES
         let (input_file, output_file) = extract_file_paths(config);
 
         let maybe_src = fs::read_to_string(input_file)
-                .map(|src| src)
                 .map_err(|err| (vec![error(err)], "".to_owned()));
 
         let compilation_result = maybe_src
             .and_then(|src| {
-                self.compile(src, &output_file)
+                self.do_compile(src, &output_file)
                     .map_err(|err| (err, "".to_owned()))
             });
 
@@ -73,12 +73,12 @@ impl Compiler {
         }
     }
 
-    fn compile(&mut self, src: String, outfile: &PathBuf) -> Result<(), Vec<Error>> {
+    fn do_compile(mut self, src: String, outfile: &PathBuf) -> Result<(), Vec<Error>> {
         let tokens = lex(src)?;
 
         let ast = parse(tokens, &mut self.type_env)?;
 
-        self.translator.translate(ast)?;
+        self.translator.translate(Some("main"), ast)?;
 
         let result = self.translator.module.finish();
 
@@ -100,15 +100,16 @@ fn fail(errs: Vec<Error>, src: String){
 
 fn extract_file_paths(config: &Config) -> (PathBuf, PathBuf) {
     match config.command {
-        Some(Commands::Compile { input_file, output_file, .. }) =>  {
+        Some(Commands::Compile { ref input_file, ref output_file, .. }) =>  {
             let output_file = output_file
+                .clone()
                 .unwrap_or_else(|| {
                     let mut copy = input_file.clone();
                     copy.set_extension(".o");
                     copy
                 });
 
-            (input_file, output_file)
+            (input_file.clone(), output_file)
         },
         
         _ => unreachable!()

@@ -1,13 +1,12 @@
 use std::{collections::HashMap, path::PathBuf, fs};
 
-use ariadne::{Fmt, Color};
 use cranelift::{prelude::{*, settings::Flags}, codegen::Context};
 use cranelift_module::DataContext;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::{types::type_env::TypeEnv, parse}, Config, lexer::lex, error::{Error, report_errors, error}, Commands};
+use crate::{parser::{types::type_env::TypeEnv, parse}, Config, lexer::lex, error::{Error, error}, Commands};
 
-use super::{translator::Translator, external_linker::link};
+use super::{translator::Translator, external_linker::link, success, fail};
 pub struct Compiler {
     translator: Translator<ObjectModule>,
 
@@ -48,32 +47,27 @@ impl Compiler {
     }
 
     pub fn compile_file(self, config: &Config) {
-        // TODO MY FUCKING EYEEEEEEEEEEEEEEEEEEES
         let (input_file, output_file) = extract_file_paths(config);
 
-        let maybe_src = fs::read_to_string(input_file)
-                .map_err(|err| (vec![error(err)], "".to_owned()));
+        let src = match fs::read_to_string(input_file) {
+            Ok(src) => src,
+            
+            Err(err) => fail(error(err), "".to_string())
+        };
 
-        let compilation_result = maybe_src
-            .and_then(|src| {
-                self.do_compile(src, &output_file)
-                    .map_err(|err| (err, "".to_owned()))
-            });
+        let compilation_result = self.do_compile(src, &output_file);
 
         let result = compilation_result
-            .and_then(|_| link(&output_file, config)
-                .map_err(|err| (err, "".to_owned())));
+            .and_then(|_| link(&output_file, config));
 
         match result {
-            Ok(_) => {
-                println!("\n\t{}", "Build succeeded".fg(Color::Green));
-            },
+            Ok(_) => success(),
 
-            Err((errs, src)) => fail(errs, src),
+            Err(err) => fail(err, src),
         }
     }
 
-    fn do_compile(mut self, src: String, outfile: &PathBuf) -> Result<(), Vec<Error>> {
+    fn do_compile(mut self, src: String, outfile: &PathBuf) -> Result<(), Error> {
         let tokens = lex(src)?;
 
         let ast = parse(tokens, &mut self.type_env)?;
@@ -83,19 +77,11 @@ impl Compiler {
         let result = self.translator.module.finish();
 
         let bytes = result.emit()
-            .map_err(|err| vec![error(err)])?;
+            .map_err(|err| error(err))?;
 
         fs::write(outfile, bytes)
-            .map_err(|err| vec![error(err)])
+            .map_err(|err| error(err))
     }
-}
-
-fn fail(errs: Vec<Error>, src: String){
-    let len = errs.len();
-    report_errors(src, errs);
-
-    let msg = format!("Build failed with {} errors", len);
-    println!("\n\t{}", msg.fg(Color::Red));
 }
 
 fn extract_file_paths(config: &Config) -> (PathBuf, PathBuf) {

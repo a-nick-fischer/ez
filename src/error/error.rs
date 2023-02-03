@@ -1,6 +1,6 @@
-use std::ops::Range;
+use std::{ops::Range};
 
-use ariadne::{Report, ReportKind, Color, Label, Fmt, ReportBuilder};
+use ariadne::{Report, ReportKind, Color, Label, Fmt, ReportBuilder, Source};
 use chumsky::{prelude::Simple, error::SimpleReason};
 use yansi::Paint;
 
@@ -9,7 +9,7 @@ use crate::{lexer::token::Token, parser::types::{typelist::TypeList, types::Type
 #[derive(Debug)]
 pub enum Error {
     LexerError { 
-        inner: Simple<char> 
+        inner: Vec<Simple<char>> 
     },
 
     GeneralError {
@@ -49,44 +49,53 @@ pub enum Error {
     },
 }
 
+
 impl Error {
-    pub fn report(&self) -> Report {
+    pub fn report(&self, src: String) {
+        let source = Source::from(src.clone());
+
+        let print = |r: ReportBuilder<_>| r
+            .finish()
+            .eprint(source)
+            .expect("Beeing able to print errors");
+
         match self {
-            Error::LexerError { inner } => lexer_error_report(inner).finish(),
+            Error::LexerError { inner } => 
+                inner
+                    .into_iter()
+                    .for_each(|lex_err| 
+                        print(lexer_error_report(lex_err))),
 
-            Error::GeneralError { message } => message_error_report(message.clone()).finish(),
+            Error::GeneralError { message } => print(message_error_report(message.clone())),
 
-            Error::VariableNotFound { token: Token::Ident { value, range } } => simple_error_report(
+            Error::VariableNotFound { token: Token::Ident { value, range } } => print(simple_error_report(
                 range.clone(), 
                 format!(
                     "The variable {} is not defined at this point",
                     value.fg(Color::Cyan)
                 ),
                 "this one".to_string()
-            )
-            .finish(),
+            )),
 
-            Error::AssigmentEmptyStack { token: Token::Ident { value, range } } => simple_error_report(
+            Error::AssigmentEmptyStack { token: Token::Ident { value, range } } => print(simple_error_report(
                 range.clone(), 
                 format!(
                     "Cannot assign to {}, as the stack is empty at this point",
                     value.fg(Color::Cyan)
                 ),
                 "this one".to_string()
-            )
-            .finish(),
+            )),
 
-            Error::AssigmentEmptyStack { token: Token::GetIdent { value, range } } => simple_error_report(
+            Error::AssigmentEmptyStack { token: Token::GetIdent { value, range } } => print(simple_error_report(
                 range.clone(), 
                 format!(
                     "Cannot assign to {}, as the stack is empty at this point",
                     value.fg(Color::Cyan)
                 ),
                 "this one".to_string()
-            )
-            .finish(),
+            )),
 
-            Error::WrongTypeInList { token, expected, got } => simple_error_report(
+            Error::WrongTypeInList { token, expected, got } => print(simple_error_report(
                 token.range().clone(), 
                 format!(
                     "This list of type {} cannot contain value of type {}",
@@ -94,14 +103,13 @@ impl Error {
                     got.fg(Color::Red)
                 ),
                 "somewhere in this list".to_string()
-            )
-            .finish(),
+            )),
 
-            Error::UnificationError { token, msg } => simple_error_report(
+            Error::UnificationError { token, msg } => print(simple_error_report(
                 token.range().clone(), 
                 msg.clone(), 
                 "here".to_string()
-            ).finish(),
+            )),
 
             Error::WrongArguments { fname, token, expected, got } => {
                 let builder = simple_error_report(
@@ -113,7 +121,7 @@ impl Error {
                     "here".to_string()
                 );
 
-                add_stack_comparison(builder, expected, got).finish()
+                print(add_stack_comparison(builder, expected, got));
             },
 
             Error::IncompatibleFunctionReturn { token, expected, got } => {
@@ -123,7 +131,7 @@ impl Error {
                     "here".to_string()
                 );
 
-                add_stack_comparison(builder, expected, got).finish()
+                print(add_stack_comparison(builder, expected, got));
             },
 
             _ => unimplemented!()

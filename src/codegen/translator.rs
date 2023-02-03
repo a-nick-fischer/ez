@@ -4,7 +4,7 @@ use cranelift::prelude::*;
 use cranelift::{codegen, prelude::{FunctionBuilderContext, FunctionBuilder, InstBuilder}};
 use cranelift_module::{Module, DataContext, Linkage, DataId, FuncId, FuncOrDataId, ModuleError};
 
-use crate::error::Error;
+use crate::error::{Error, error};
 use crate::parser::node::Literal;
 use crate::{parser::{node::Node, types::{types::Type, *}}};
 
@@ -21,7 +21,7 @@ pub struct Translator<M: Module> {
 }
 
 impl<M: Module> Translator<M> {
-    pub fn translate(&mut self, name: Option<&str>, nodes: Vec<Node>) -> Result<FuncId, Vec<Error>> {
+    pub fn translate(&mut self, name: Option<&str>, nodes: Vec<Node>) -> Result<FuncId, Error> {
         let mut tran = FunctionTranslator::new(self);
         
         for node in nodes {
@@ -34,46 +34,41 @@ impl<M: Module> Translator<M> {
         Ok(id)
     }
 
-    fn create_data(&mut self, name: String, content: Vec<u8>) -> Result<DataId, Vec<Error>> {
+    fn create_data(&mut self, name: String, content: Vec<u8>) -> Result<DataId, Error> {
         self.data_ctx.define(content.into_boxed_slice());
 
         let id = self
             .module
-            .declare_data(&name, Linkage::Export, true, false)
-            .map_err(|err| vec![err.into()])?;
+            .declare_data(&name, Linkage::Export, true, false)?;
 
         self.module
-            .define_data(id, &self.data_ctx)
-            .map_err(|err| vec![err.into()])?;
+            .define_data(id, &self.data_ctx)?;
 
         // self.data_ctx.clear(); // TODO Needed?
 
         Ok(id)
     }
 
-    fn create_func(&mut self, maybe_name: Option<&str>, sig: Signature) -> Result<FuncId, Vec<Error>> {
+    fn create_func(&mut self, maybe_name: Option<&str>, sig: Signature) -> Result<FuncId, Error> {
         let id = 
             if let Some(name) = maybe_name {
                 self
                     .module
-                    .declare_function(name, Linkage::Export, &sig)
-                    .map_err(|err| vec![err.into()])?
+                    .declare_function(name, Linkage::Export, &sig)?
             }
             else {
                 self
                     .module
-                    .declare_anonymous_function(&sig)
-                    .map_err(|err| vec![err.into()])?
+                    .declare_anonymous_function(&sig)?
             };
         
         self.module
-            .define_function(id, &mut self.ctx)
-            .map_err(|err| vec![err.into()])?;
+            .define_function(id, &mut self.ctx)?;
 
         Ok(id)
     }
 
-    fn get_func_by_name(&self, name: &str) -> Result<FuncId, Vec<Error>> {
+    fn get_func_by_name(&self, name: &str) -> Result<FuncId, Error> {
         let maybe_func = self
             .module
             .declarations()
@@ -127,7 +122,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         }
     }
 
-    fn translate_node(&mut self, node: Node) -> Result<(), Vec<Error>> {
+    fn translate_node(&mut self, node: Node) -> Result<(), Error> {
         match node {
             Node::Assigment { name, .. } => {
                 let var = Variable::new(self.variables.len());
@@ -179,7 +174,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         Ok(())
     }
 
-    fn build_literal(&mut self, typ: Type, literal: Literal) -> Result<Value, Vec<Error>> {
+    fn build_literal(&mut self, typ: Type, literal: Literal) -> Result<Value, Error> {
         if let Type::Kind(typ_name, _type_vars) = typ {
             match (typ_name.as_str(), literal) {
                 (QUOTE_TYPE_NAME, Literal::Quote(value)) => {
@@ -224,7 +219,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         else { unreachable!() }
     }
     
-    fn ins_malloc(&mut self, size: Value) -> Result<Value, Vec<Error>> {
+    fn ins_malloc(&mut self, size: Value) -> Result<Value, Error> {
         let malloc = self.parent.get_func_by_name("malloc")?;
         
         let local_callee = self
@@ -253,10 +248,6 @@ impl Into<cranelift::prelude::Type> for Type {
             Type::Variable(_, _) => panic!("Variables not allowed"),
         }
     }
-}
-
-fn error(message: String) -> Vec<Error> {
-    vec![Error::GeneralError { message }]
 }
 
 impl From<ModuleError> for Error {

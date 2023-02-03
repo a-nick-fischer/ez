@@ -1,13 +1,12 @@
-use std::{collections::HashMap, path::PathBuf, fs};
+use std::{collections::HashMap, fs, mem};
 
-use ariadne::{Color, Fmt};
 use cranelift::prelude::*;
 use cranelift_jit::{JITModule, JITBuilder};
 use cranelift_module::{DataContext, Module};
 
-use crate::{Config, parser::{types::type_env::TypeEnv, parse}, error::{report_errors, Error, error}, lexer::lex};
+use crate::{Config, parser::{types::type_env::TypeEnv, parse}, error::{Error, error}, lexer::lex};
 
-use super::translator::Translator;
+use super::{translator::Translator, fail};
 
 pub struct Jit {
     translator: Translator<JITModule>,
@@ -34,32 +33,39 @@ impl Jit {
     }
 
     pub fn run_file(&mut self, config: &Config){
-        let input_file = config.file.clone().expect("not triggering a compilter bug");
+        let input_file = config.file.clone().expect("not triggering a compiler bug");
 
         match fs::read_to_string(input_file) {
             Ok(src) => self.run_expr(src, config),
 
-            Err(err) => fail(vec![error(err)], "".to_string()),
+            Err(err) => fail(error(err), "".to_string()),
         }
     }
 
     pub fn run_expr(&mut self, expr: String, config: &Config){
-        
+        match self.do_run(expr.clone(), config) {
+            Ok(_) => todo!(),
+
+            Err(errs) => fail(errs, expr),
+        }
     }
 
-    pub fn do_run(&mut self, expr: String, config: &Config) -> Result<(), Vec<Error>> {
+    pub fn do_run(&mut self, expr: String, config: &Config) -> Result<(), Error> {
         let tokens = lex(expr)?;
 
         let ast = parse(tokens, &mut self.type_env)?;
 
         let func = self.translator.translate(None, ast)?;
+
+        self.translator.module.finalize_definitions().unwrap(); // TODO Error handling
+
+        let pointer = self.translator.module.get_finalized_function(func);
+
+        unsafe {
+            let fun = mem::transmute::<_, fn() -> ()>(pointer);
+            fun();
+        }
+
+        Ok(())
     }
-}
-
-fn fail(errs: Vec<Error>, src: String){
-    let len = errs.len();
-    report_errors(src, errs);
-
-    let msg = format!("Build failed with {} errors", len);
-    println!("\n\t{}", msg.fg(Color::Red));
 }

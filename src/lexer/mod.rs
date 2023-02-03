@@ -16,13 +16,9 @@ fn preprocess_tokens(tokens: Vec<Token>) -> Vec<Token> {
         .collect()
 }
 
-pub fn lex(src: String) -> Result<Vec<Token>, Vec<Error>> {
+pub fn lex(src: String) -> Result<Vec<Token>, Error> {
     let (tokens, errs) = lexer().parse_recovery_verbose(src);
 
     tokens.map(preprocess_tokens)
-        .ok_or_else(||
-            errs.into_iter()
-                .map(|err| Error::LexerError { inner: err })
-                .collect()
-        )
+        .ok_or_else(|| Error::LexerError { inner: errs })
 }

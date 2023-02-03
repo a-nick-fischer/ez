@@ -62,14 +62,12 @@ pub fn sig_lexer() -> impl Parser<char, Signature, Error = Simple<char>> + Clone
         .map(|(args, ret)| Signature(args, ret))
 }
 
-pub fn lex_sig(src: &str) -> Result<Signature, Vec<Error>> {
+pub fn lex_sig(src: &str) -> Result<Signature, Error> {
     let (result, errs) = sig_lexer().parse_recovery_verbose(src.to_string());
 
     match result {
         Some(sig) => Ok(sig),
 
-        None => Err(errs.into_iter()
-                .map(|err| Error::LexerError { inner: err })
-                .collect())
+        None => Err(Error::LexerError { inner: errs })
     }
 }

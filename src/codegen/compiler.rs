@@ -4,7 +4,7 @@ use cranelift::{prelude::{*, settings::Flags}, codegen::Context};
 use cranelift_module::DataContext;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::{types::type_env::TypeEnv, parse}, Config, lexer::lex, error::{Error, error}, Commands};
+use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, LinkageConfig}};
 
 use super::{translator::Translator, external_linker::link, success, fail};
 pub struct Compiler {
@@ -46,7 +46,7 @@ impl Compiler {
         }
     }
 
-    pub fn compile_file(self, config: &Config) {
+    pub fn compile_file(self, config: &CompilationConfig) {
         let (input_file, output_file) = extract_file_paths(config);
 
         let src = match fs::read_to_string(input_file) {
@@ -58,7 +58,9 @@ impl Compiler {
         let compilation_result = self.do_compile(src, &output_file);
 
         let result = compilation_result
-            .and_then(|_| link(&output_file, config));
+            .and_then(|_| link(&output_file, &config.linkage))
+            .and_then(|_| fs::remove_file(&output_file) // Delete object file, not the actual output executable
+                .map_err(|err| error(err)));
 
         match result {
             Ok(_) => success(),
@@ -84,20 +86,14 @@ impl Compiler {
     }
 }
 
-fn extract_file_paths(config: &Config) -> (PathBuf, PathBuf) {
-    match config.command {
-        Some(Commands::Compile { ref input_file, ref output_file, .. }) =>  {
-            let output_file = output_file
-                .clone()
-                .unwrap_or_else(|| {
-                    let mut copy = input_file.clone();
-                    copy.set_extension(".o");
-                    copy
-                });
+fn extract_file_paths(config: &CompilationConfig) -> (PathBuf, PathBuf) {
+    let input_file = config.input_file;
 
-            (input_file.clone(), output_file)
-        },
-        
-        _ => unreachable!()
-    }
+    let mut output_file = config.output_file
+        .clone()
+        .unwrap_or_else(|| input_file.clone());
+
+    output_file.set_extension(".o");
+
+    (input_file, output_file)
 }

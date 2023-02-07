@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, mem};
+use std::{collections::{HashMap, HashSet}, fs, mem};
 
 use cranelift::prelude::*;
 use cranelift_jit::{JITModule, JITBuilder};
@@ -67,5 +67,9 @@ impl Jit {
         }
 
         Ok(())
+    }
+
+    pub fn defined_symbols(&self) -> impl Iterator<Item = &String> {
+        self.type_env.bindings.keys()
     }
 }

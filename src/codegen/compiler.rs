@@ -21,6 +21,7 @@ impl Compiler {
                 let mut flag_builder = settings::builder();
                 flag_builder.set("use_colocated_libcalls", "false").unwrap();
                 flag_builder.set("is_pic", "true").unwrap();
+                // TODO Use EGraphs
 
                 let flags = Flags::new(flag_builder);
                 builder.finish(flags).unwrap() // TODO Errorhandling

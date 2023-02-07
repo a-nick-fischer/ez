@@ -2,9 +2,9 @@ use chumsky::Parser;
 
 use crate::error::Error;
 
-use self::{token::Token, why_lexer::lexer};
+use self::{token::Token, ez_lexer::lexer};
 
-mod why_lexer;
+mod ez_lexer;
 pub mod sig_lexer;
 pub mod token;
 

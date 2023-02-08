@@ -9,7 +9,7 @@ use crate::parser::node::Node;
 
 use super::function_translator::FunctionTranslator;
 
-pub struct Translator<M: Module> {
+pub struct CodeGen<M: Module> {
     pub builder_context: FunctionBuilderContext,
 
     pub ctx: codegen::Context,
@@ -21,12 +21,12 @@ pub struct Translator<M: Module> {
     pub naming_idx: u32
 }
 
-impl<M: Module> Translator<M> {
+impl<M: Module> CodeGen<M> {
     pub fn translate(&mut self, name: Option<&str>, nodes: Vec<Node>) -> Result<FuncId, Error> {
         let mut tran = FunctionTranslator::new(&mut self);
         
         for node in nodes {
-            tran.translate_node(node)?;
+            tran.translate_node(node, &mut self)?;
         }
 
         let sig = self.module.make_signature();
@@ -35,7 +35,7 @@ impl<M: Module> Translator<M> {
         Ok(id)
     }
 
-    fn create_data(&mut self, name: String, content: Vec<u8>) -> Result<DataId, Error> {
+    pub fn create_data(&mut self, name: String, content: Vec<u8>) -> Result<DataId, Error> {
         self.data_ctx.define(content.into_boxed_slice());
 
         let id = self
@@ -50,7 +50,7 @@ impl<M: Module> Translator<M> {
         Ok(id)
     }
 
-    fn create_func(&mut self, maybe_name: Option<&str>, sig: Signature) -> Result<FuncId, Error> {
+    pub fn create_func(&mut self, maybe_name: Option<&str>, sig: Signature) -> Result<FuncId, Error> {
         let id = 
             if let Some(name) = maybe_name {
                 self
@@ -69,7 +69,7 @@ impl<M: Module> Translator<M> {
         Ok(id)
     }
 
-    fn get_func_by_name(&self, name: &str) -> Result<FuncId, Error> {
+    pub fn get_func_by_name(&self, name: &str) -> Result<FuncId, Error> {
         let maybe_func = self
             .module
             .declarations()
@@ -82,34 +82,22 @@ impl<M: Module> Translator<M> {
         }
     }
 
-    fn pointer_type(&self) -> cranelift::prelude::Type {
-        self.module.target_config().pointer_type()
-    }
-
-    fn gen_name(&mut self, prefix: &str) -> String {
+    pub fn gen_name(&mut self, prefix: &str) -> String {
         self.naming_idx += 1;
         format!("{}{}", prefix, self.naming_idx)
     }
 
-    fn declare_external_func(&self, name: &str, sig_src: &str) -> Result<(), Error> {
+    pub fn declare_external_func(&self, name: &str, sig_src: &str) -> Result<(), Error> {
         let lexed_sig = lex_signature(sig_src)?;
         let (parsed_args, parsed_returns) = parse_signature(lexed_sig);
     
         let mut sig = self.module.make_signature();
     
-        sig.params.extend(
-            parsed_args.vec()
-                .into_iter()
-                .map(|typ| AbiParam::new(typ.into()))
-                .collect()
-        );
+        let params: Vec<AbiParam> = parsed_args.into();
+        sig.params.extend(params);
     
-        sig.returns.extend(
-            parsed_returns.vec()
-                .into_iter()
-                .map(|typ| AbiParam::new(typ.into()))
-                .collect()
-        );
+        let returns: Vec<AbiParam> = parsed_returns.into();
+        sig.returns.extend(returns);
     
         let callee = self.module
             .declare_function(name, Linkage::Import, &sig)

@@ -1,12 +1,14 @@
 use std::process::exit;
 
 use ariadne::{Color, Fmt};
+use cranelift::prelude::AbiParam;
+use cranelift_module::ModuleError;
 
-use crate::{error::Error, parser::types::types::Type};
+use crate::{error::Error, parser::types::{types::Type, typelist::TypeList}};
 
 pub mod compiler;
 pub mod jit;
-pub mod translator;
+pub mod codegen;
 pub mod external_linker;
 pub mod function_translator;
 
@@ -33,5 +35,20 @@ impl Into<cranelift::prelude::Type> for Type {
 
             Type::Variable(_, _) => panic!("Variables not allowed"),
         }
+    }
+}
+
+impl Into<Vec<AbiParam>> for TypeList {
+    fn into(self) -> Vec<AbiParam> {
+        self.vec()
+            .into_iter()
+            .map(|typ| AbiParam::new(typ.clone().into()))
+            .collect()
+    }
+}
+
+impl From<ModuleError> for Error {
+    fn from(value: ModuleError) -> Self {
+        Error::GeneralError { message: value.to_string() }
     }
 }

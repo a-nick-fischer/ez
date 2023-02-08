@@ -6,9 +6,9 @@ use cranelift_object::{ObjectModule, ObjectBuilder};
 
 use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::CompilationConfig};
 
-use super::{translator::Translator, external_linker::link, success, fail};
+use super::{codegen::CodeGen, external_linker::link, success, fail};
 pub struct Compiler {
-    translator: Translator<ObjectModule>,
+    translator: CodeGen<ObjectModule>,
 
     type_env: TypeEnv
 }
@@ -35,7 +35,7 @@ impl Compiler {
         let module = ObjectModule::new(builder.unwrap());
 
         Self {
-            translator: Translator { 
+            translator: CodeGen { 
                 builder_context: FunctionBuilderContext::new(),
                 ctx: Context::new(),
                 data_ctx: DataContext::new(),

@@ -6,10 +6,10 @@ use cranelift_module::{DataContext, Module};
 
 use crate::{Config, parser::{types::type_env::TypeEnv, parse}, error::{Error, error}, lexer::lex};
 
-use super::{translator::Translator, fail};
+use super::{codegen::CodeGen, fail};
 
 pub struct Jit {
-    translator: Translator<JITModule>,
+    translator: CodeGen<JITModule>,
 
     type_env: TypeEnv
 }
@@ -20,7 +20,7 @@ impl Jit {
         let module = JITModule::new(builder.unwrap());
 
         Self {
-            translator: Translator {
+            translator: CodeGen {
                 builder_context: FunctionBuilderContext::new(),
                 ctx: module.make_context(),
                 data_ctx: DataContext::new(),

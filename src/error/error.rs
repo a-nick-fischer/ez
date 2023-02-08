@@ -244,9 +244,3 @@ fn escape(inp: &str) -> String {
         _ => format!("'{inp}'")
     }
 }
-
-impl From<dyn std::error::Error> for Error {
-    fn from(value: Error) -> Self {
-        Error::GeneralError { message: value.to_string() }
-    }
-}

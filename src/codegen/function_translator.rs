@@ -1,9 +1,11 @@
 use std::collections::HashMap;
 
-use cranelift::prelude::{FunctionBuilder, Value, Variable};
+use cranelift::prelude::{FunctionBuilder, Value, Variable, EntityRef, InstBuilder};
 use cranelift_module::Module;
 
-use super::translator::Translator;
+use crate::{parser::{node::{Node, Literal}, types::types::Type}, error::{Error, error}};
+
+use super::{codegen::CodeGen, pointer_type};
 
 
 pub struct FunctionTranslator<'a> {
@@ -15,7 +17,7 @@ pub struct FunctionTranslator<'a> {
 }
 
 impl<'a> FunctionTranslator<'a> {
-    pub fn new<M: Module>(parent: &mut Translator<M>) -> Self {
+    pub fn new<M: Module>(parent: &mut CodeGen<M>) -> Self {
         FunctionTranslator { 
             builder: FunctionBuilder::new(&mut parent.ctx.func, &mut parent.builder_context), 
             variables: HashMap::new(),
@@ -23,7 +25,7 @@ impl<'a> FunctionTranslator<'a> {
         }
     }
 
-    pub fn translate_node(&mut self, node: Node) -> Result<(), Error> {
+    pub fn translate_node<M: Module>(&mut self, node: Node, parent: &mut CodeGen<M>) -> Result<(), Error> {
         match node {
             Node::Assigment { name, .. } => {
                 let var = Variable::new(self.variables.len());
@@ -41,23 +43,13 @@ impl<'a> FunctionTranslator<'a> {
                 self.stack.push(val);
             },
     
-            Node::Call { name, arguments, returns, .. } => {
-                let func = self.parent.get_func_by_name(name.as_str())?;
-
-                let local_callee = self
-                    .parent
-                    .module
-                    .declare_func_in_func(func, self.builder.func);
-
-                let slice = &self.stack[arguments.len()..];
-                let inst = self.builder.ins().call(local_callee, slice);
-
-                let returns = self.builder.inst_results(inst);
-                self.stack.extend_from_slice(returns);
+            Node::Call { name, arguments, .. } => {
+                let return_vals = self.ins_call(name, arguments.len(), parent)?;
+                self.stack.extend_from_slice(return_vals);
             },
     
             Node::Literal { typ, value, .. } => {
-                let val = self.build_literal(typ, value)?;
+                let val = self.build_literal(typ, value, parent)?;
                 self.stack.push(val);
             }
         }
@@ -65,22 +57,20 @@ impl<'a> FunctionTranslator<'a> {
         Ok(())
     }
 
-    fn build_literal(&mut self, typ: Type, literal: Literal) -> Result<Value, Error> {
+    fn build_literal<M: Module>(&mut self, typ: Type, literal: Literal, parent: &mut CodeGen<M>) -> Result<Value, Error> {
         if let Type::Kind(typ_name, _type_vars) = typ {
             match (typ_name.as_str(), literal) {
                 (QUOTE_TYPE_NAME, Literal::Quote(value)) => {
-                    let name = self.parent.gen_name();
-                    let id = self.parent.create_data(
-                        name,
+                    let id = parent.create_data(
+                        parent.gen_name("s"),
                         value.as_bytes().to_vec()
                     )?;
 
-                    let local_id = self
-                        .parent
+                    let local_id = parent
                         .module
                         .declare_data_in_func(id, self.builder.func);
 
-                    let pointer = self.parent.pointer_type();
+                    let pointer = pointer_type();
                     Ok(self.builder.ins().symbol_value(pointer, local_id))
                 },
     
@@ -93,14 +83,13 @@ impl<'a> FunctionTranslator<'a> {
                 },
     
                 (FUNC_TYPE_NAME, Literal::Function(ast)) => {
-                    let func = self.parent.translate(None, ast)?;
+                    let func = parent.translate(None, ast)?;
 
-                    let local_callee = self
-                        .parent
+                    let local_callee = parent
                         .module
                         .declare_func_in_func(func, self.builder.func);
 
-                    Ok(self.builder.ins().func_addr(self.parent.pointer_type(), local_callee))
+                    Ok(self.builder.ins().func_addr(pointer_type(), local_callee))
                 },
     
                 _ => unreachable!()
@@ -109,16 +98,17 @@ impl<'a> FunctionTranslator<'a> {
         }
         else { unreachable!() }
     }
-    
-    fn ins_malloc(&mut self, size: Value) -> Result<Value, Error> {
-        let malloc = self.parent.get_func_by_name("malloc")?;
-        
-        let local_callee = self
-            .parent
-            .module
-            .declare_func_in_func(malloc, &mut self.builder.func);
 
-        let call = self.builder.ins().call(local_callee, &[size]);
-        Ok(self.builder.inst_results(call)[0])
+    fn ins_call<S: AsRef<str>, M: Module>(&mut self, name: S, args_len: usize, parent: &mut CodeGen<M>) -> Result<&[Value], Error> {
+        let func_id = parent.get_func_by_name(name.as_ref())?;
+        
+        let local_callee = parent
+            .module
+            .declare_func_in_func(func_id, &mut self.builder.func);
+
+        let slice = &self.stack[args_len..];
+        let call = self.builder.ins().call(local_callee, slice);
+
+        Ok(self.builder.inst_results(call))
     }
 }

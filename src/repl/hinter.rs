@@ -1,7 +1,4 @@
 
-/// A hinter that use the completions or the history to show a hint to the user
-///
-/// Similar to `fish` autosuggestins
 pub struct DefaultHinter {
     style: Style,
     current_hint: String,
@@ -12,22 +9,12 @@ impl Hinter for DefaultHinter {
     fn handle(
         &mut self,
         line: &str,
-        #[allow(unused_variables)] pos: usize,
-        history: &dyn History,
+        _pos: usize,
+        _history: &dyn History,
         use_ansi_coloring: bool,
     ) -> String {
         self.current_hint = if line.chars().count() >= self.min_chars {
-            history
-                .search(SearchQuery::last_with_prefix(line.to_string()))
-                .expect("todo: error handling")
-                .get(0)
-                .map_or_else(String::new, |entry| {
-                    entry
-                        .command_line
-                        .get(line.len()..)
-                        .unwrap_or_default()
-                        .to_string()
-                })
+            
         } else {
             String::new()
         };

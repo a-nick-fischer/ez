@@ -23,10 +23,10 @@ pub struct CodeGen<M: Module> {
 
 impl<M: Module> CodeGen<M> {
     pub fn translate(&mut self, name: Option<&str>, nodes: Vec<Node>) -> Result<FuncId, Error> {
-        let mut tran = FunctionTranslator::new(&mut self);
+        let mut tran = FunctionTranslator::new(self);
         
         for node in nodes {
-            tran.translate_node(node, &mut self)?;
+            tran.translate_node(node)?;
         }
 
         let sig = self.module.make_signature();
@@ -87,7 +87,7 @@ impl<M: Module> CodeGen<M> {
         format!("{}{}", prefix, self.naming_idx)
     }
 
-    pub fn declare_external_func(&self, name: &str, sig_src: &str) -> Result<(), Error> {
+    pub fn declare_external_func(&mut self, name: &str, sig_src: &str) -> Result<FuncId, Error> {
         let lexed_sig = lex_signature(sig_src)?;
         let (parsed_args, parsed_returns) = parse_signature(lexed_sig);
     
@@ -99,10 +99,10 @@ impl<M: Module> CodeGen<M> {
         let returns: Vec<AbiParam> = parsed_returns.into();
         sig.returns.extend(returns);
     
-        let callee = self.module
+        let func_id = self.module
             .declare_function(name, Linkage::Import, &sig)
             .expect("problem declaring function");
     
-        return Ok(())
+        return Ok(func_id)
     }
 }

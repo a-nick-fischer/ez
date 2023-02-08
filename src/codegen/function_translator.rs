@@ -3,29 +3,32 @@ use std::collections::HashMap;
 use cranelift::prelude::{FunctionBuilder, Value, Variable, EntityRef, InstBuilder};
 use cranelift_module::Module;
 
-use crate::{parser::{node::{Node, Literal}, types::types::Type}, error::{Error, error}};
+use crate::{parser::{node::{Node, Literal}, types::{types::Type, self}}, error::{Error, error}};
 
 use super::{codegen::CodeGen, pointer_type};
 
 
-pub struct FunctionTranslator<'a> {
+pub struct FunctionTranslator<'a, M: Module> {
     builder: FunctionBuilder<'a>,
+
+    codegen: &'a mut CodeGen<M>,
 
     variables: HashMap<String, Variable>,
 
     stack: Vec<Value>
 }
 
-impl<'a> FunctionTranslator<'a> {
-    pub fn new<M: Module>(parent: &mut CodeGen<M>) -> Self {
+impl<'a, M: Module> FunctionTranslator<'a, M> {
+    pub fn new(codegen: &'a mut CodeGen<M>) -> Self {
         FunctionTranslator { 
-            builder: FunctionBuilder::new(&mut parent.ctx.func, &mut parent.builder_context), 
+            builder: FunctionBuilder::new(&mut codegen.ctx.func, &mut codegen.builder_context), 
+            codegen,
             variables: HashMap::new(),
             stack: Vec::new()
         }
     }
 
-    pub fn translate_node<M: Module>(&mut self, node: Node, parent: &mut CodeGen<M>) -> Result<(), Error> {
+    pub fn translate_node(&mut self, node: Node) -> Result<(), Error> {
         match node {
             Node::Assigment { name, .. } => {
                 let var = Variable::new(self.variables.len());
@@ -43,13 +46,11 @@ impl<'a> FunctionTranslator<'a> {
                 self.stack.push(val);
             },
     
-            Node::Call { name, arguments, .. } => {
-                let return_vals = self.ins_call(name, arguments.len(), parent)?;
-                self.stack.extend_from_slice(return_vals);
-            },
+            Node::Call { name, arguments, .. } => 
+                self.ins_call(name, arguments.len())?,
     
             Node::Literal { typ, value, .. } => {
-                let val = self.build_literal(typ, value, parent)?;
+                let val = self.build_literal(typ, value)?;
                 self.stack.push(val);
             }
         }
@@ -57,16 +58,19 @@ impl<'a> FunctionTranslator<'a> {
         Ok(())
     }
 
-    fn build_literal<M: Module>(&mut self, typ: Type, literal: Literal, parent: &mut CodeGen<M>) -> Result<Value, Error> {
+    fn build_literal(&mut self, typ: Type, literal: Literal) -> Result<Value, Error> {
         if let Type::Kind(typ_name, _type_vars) = typ {
             match (typ_name.as_str(), literal) {
-                (QUOTE_TYPE_NAME, Literal::Quote(value)) => {
-                    let id = parent.create_data(
-                        parent.gen_name("s"),
+                (types::QUOTE_TYPE_NAME, Literal::Quote(value)) => {
+                    let name = self.codegen.gen_name("s");
+                    
+                    let id = self.codegen.create_data(
+                        name,
                         value.as_bytes().to_vec()
                     )?;
 
-                    let local_id = parent
+                    let local_id = self
+                        .codegen
                         .module
                         .declare_data_in_func(id, self.builder.func);
 
@@ -74,18 +78,19 @@ impl<'a> FunctionTranslator<'a> {
                     Ok(self.builder.ins().symbol_value(pointer, local_id))
                 },
     
-                (NUMBER_TYPE_NAME, Literal::Number(value)) => {
+                (types::NUMBER_TYPE_NAME, Literal::Number(value)) => {
                     Ok(self.builder.ins().f64const(value))
                 },
 
-                (LIST_TYPE_NAME, Literal::List(ast)) => {
+                (types::LIST_TYPE_NAME, Literal::List(ast)) => {
                     todo!() // TODO No fcking clue how to translate this one..
                 },
     
-                (FUNC_TYPE_NAME, Literal::Function(ast)) => {
-                    let func = parent.translate(None, ast)?;
+                (types::FUNC_TYPE_NAME, Literal::Function(ast)) => {
+                    let func = self.codegen.translate(None, ast)?;
 
-                    let local_callee = parent
+                    let local_callee = self
+                        .codegen
                         .module
                         .declare_func_in_func(func, self.builder.func);
 
@@ -99,16 +104,20 @@ impl<'a> FunctionTranslator<'a> {
         else { unreachable!() }
     }
 
-    fn ins_call<S: AsRef<str>, M: Module>(&mut self, name: S, args_len: usize, parent: &mut CodeGen<M>) -> Result<&[Value], Error> {
-        let func_id = parent.get_func_by_name(name.as_ref())?;
+    fn ins_call<S: AsRef<str>>(&mut self, name: S, args_len: usize) -> Result<(), Error> {
+        let func_id = self.codegen.get_func_by_name(name.as_ref())?;
         
-        let local_callee = parent
+        let local_callee = self
+            .codegen
             .module
             .declare_func_in_func(func_id, &mut self.builder.func);
 
         let slice = &self.stack[args_len..];
         let call = self.builder.ins().call(local_callee, slice);
 
-        Ok(self.builder.inst_results(call))
+        let results = self.builder.inst_results(call);
+        self.stack.extend_from_slice(results);
+
+        Ok(())
     }
 }

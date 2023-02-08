@@ -56,7 +56,7 @@ impl Compiler {
             Err(err) => fail(error(err), "".to_string())
         };
 
-        let compilation_result = self.do_compile(src, &output_file);
+        let compilation_result = self.do_compile(src.clone(), &output_file);
 
         let result = compilation_result
             .and_then(|_| link(&output_file, &config.linkage))
@@ -88,7 +88,7 @@ impl Compiler {
 }
 
 fn extract_file_paths(config: &CompilationConfig) -> (PathBuf, PathBuf) {
-    let input_file = config.input_file;
+    let input_file = &config.input_file;
 
     let mut output_file = config.output_file
         .clone()
@@ -96,5 +96,5 @@ fn extract_file_paths(config: &CompilationConfig) -> (PathBuf, PathBuf) {
 
     output_file.set_extension(".o");
 
-    (input_file, output_file)
+    (input_file.clone(), output_file)
 }

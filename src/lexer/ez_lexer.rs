@@ -1,6 +1,6 @@
 use chumsky::prelude::*;
 
-use super::{token::Token, sig_lexer::{Signature, sig_lexer}};
+use super::{token::Token, sig_lexer::sig_lexer};
 
 fn ident_lexer() -> impl Parser<char, String, Error = Simple<char>> + Clone {
     let punctuation = filter(|c: &char| {

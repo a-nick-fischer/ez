@@ -1,4 +1,4 @@
-mod signature_parser;
+pub mod signature_parser;
 pub mod node;
 pub mod types;
 pub mod ast;

@@ -1,4 +1,4 @@
-use crate::config::DebugConfig;
+use crate::{config::DebugConfig, lexer::token::Token, parser::node::Node};
 
 pub fn debug_tokens(tokens: &Vec<Token>, config: &DebugConfig){
 

@@ -4,7 +4,7 @@ use cranelift::{prelude::{*, settings::Flags}, codegen::Context};
 use cranelift_module::DataContext;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, LinkageConfig}};
+use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::CompilationConfig};
 
 use super::{translator::Translator, external_linker::link, success, fail};
 pub struct Compiler {

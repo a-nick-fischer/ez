@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, fs, mem};
+use std::{collections::HashMap, fs, mem};
 
 use cranelift::prelude::*;
 use cranelift_jit::{JITModule, JITBuilder};

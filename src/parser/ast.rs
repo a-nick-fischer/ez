@@ -6,7 +6,7 @@ pub type FuncInstances = HashSet<HashMap<String, Type>>;
 
 pub struct FuncInfo {
     pub instances: FuncInstances,
-    pub captured_vars: HashSet<String>
+    pub captured_vars: HashSet<String>,
     pub closures: HashMap<String, FuncInfo>,
     pub inline_candidate: bool
 }

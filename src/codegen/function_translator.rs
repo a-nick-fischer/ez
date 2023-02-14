@@ -1,17 +1,41 @@
 use std::collections::HashMap;
 
-use cranelift::prelude::{FunctionBuilder, Value, Variable, EntityRef, InstBuilder};
-use cranelift_module::Module;
+use cranelift::{prelude::{FunctionBuilder, Value, Variable, EntityRef, InstBuilder, FunctionBuilderContext, isa::{CallConv, TargetFrontendConfig}}, codegen::Context};
+use cranelift_module::{Module, Linkage, FuncId};
 
 use crate::{parser::{node::{Node, Literal}, types::{types::Type, self}}, error::{Error, error}};
 
 use super::{codegen::CodeGen, pointer_type};
 
+pub struct FunctionOptions {
+    call_conv: CallConv,
+    linkage: Linkage
+}
+
+impl FunctionOptions {
+    pub fn external(config: &TargetFrontendConfig) -> Self {
+        FunctionOptions { 
+            call_conv: config.default_call_conv,
+            linkage: Linkage::Export
+        }
+    }
+
+    pub fn internal() -> Self {
+        FunctionOptions { 
+            call_conv: CallConv::Fast,
+            linkage: Linkage::Local
+        }
+    }
+}
 
 pub struct FunctionTranslator<'a, M: Module> {
     builder: FunctionBuilder<'a>,
 
     codegen: &'a mut CodeGen<M>,
+
+    pub context: Context,
+
+    options: FunctionOptions,
 
     variables: HashMap<String, Variable>,
 
@@ -19,13 +43,61 @@ pub struct FunctionTranslator<'a, M: Module> {
 }
 
 impl<'a, M: Module> FunctionTranslator<'a, M> {
-    pub fn new(codegen: &'a mut CodeGen<M>) -> Self {
+    pub fn new(
+        codegen: &'a mut CodeGen<M>, 
+        builder_context: &'a mut FunctionBuilderContext,
+        options: FunctionOptions
+    ) -> Self {
+        let mut context = Context::new();
+        context.set_disasm(true); // TODO This is computed even when not needed
+
+        let builder = FunctionBuilder::new(
+            &mut context.func, 
+            builder_context
+        );
+
         FunctionTranslator { 
-            builder: FunctionBuilder::new(&mut codegen.ctx.func, &mut codegen.builder_context), 
+            builder, 
             codegen,
+            context,
+            options,
             variables: HashMap::new(),
             stack: Vec::new()
         }
+    }
+
+    pub fn to_func(&mut self, name: String, sig_src: &str) -> Result<FuncId, Error> {
+        let mut sig = self.codegen.build_signature(sig_src)?;
+        sig.call_conv = self.options.call_conv;
+
+        let id = self
+            .codegen
+            .module
+            .declare_function(name.as_str(), self.options.linkage, &sig)?;
+
+        self
+            .codegen
+            .module
+            .define_function(id, &mut self.context)?;
+
+        Ok(id)
+    }
+
+    pub fn to_anon_func(&mut self, sig_src: &str) -> Result<FuncId, Error> {
+        let mut sig = self.codegen.build_signature(sig_src)?;
+        sig.call_conv = self.options.call_conv;
+
+        let id = self
+            .codegen
+            .module
+            .declare_anonymous_function(&sig)?;
+
+        self
+            .codegen
+            .module
+            .define_function(id, &mut self.context)?;
+
+        Ok(id)
     }
 
     pub fn translate_node(&mut self, node: Node) -> Result<(), Error> {
@@ -62,10 +134,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         if let Type::Kind(typ_name, _type_vars) = typ {
             match (typ_name.as_str(), literal) {
                 (types::QUOTE_TYPE_NAME, Literal::Quote(value)) => {
-                    let name = self.codegen.gen_name("s");
-                    
                     let id = self.codegen.create_data(
-                        name,
                         value.as_bytes().to_vec()
                     )?;
 
@@ -82,12 +151,12 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                     Ok(self.builder.ins().f64const(value))
                 },
 
-                (types::LIST_TYPE_NAME, Literal::List(ast)) => {
+                (types::LIST_TYPE_NAME, Literal::List(_ast)) => {
                     todo!() // TODO No fcking clue how to translate this one..
                 },
     
                 (types::FUNC_TYPE_NAME, Literal::Function(ast)) => {
-                    let func = self.codegen.translate(None, ast)?;
+                    let func = self.codegen.translate(None, ast, FunctionOptions::internal())?;
 
                     let local_callee = self
                         .codegen

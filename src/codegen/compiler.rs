@@ -1,12 +1,13 @@
 use std::{collections::HashMap, path::PathBuf, fs};
 
-use cranelift::{prelude::{*, settings::Flags}, codegen::Context};
-use cranelift_module::DataContext;
+use cranelift::{prelude::{*, settings::Flags}};
+
+use cranelift_module::Module;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::CompilationConfig};
+use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}};
 
-use super::{codegen::CodeGen, external_linker::link, success, fail};
+use super::{codegen::CodeGen, external_linker::link, success, fail, function_translator::FunctionOptions};
 pub struct Compiler {
     translator: CodeGen<ObjectModule>,
 
@@ -19,9 +20,13 @@ impl Compiler {
             Ok(builder) => {
                 // See https://github.com/bytecodealliance/wasmtime/blob/e4dc9c79443259e40f3e93b9c7815b0645ebd5c4/cranelift/jit/src/backend.rs#L50
                 let mut flag_builder = settings::builder();
-                flag_builder.set("use_colocated_libcalls", "false").unwrap();
+                flag_builder.set("use_colocated_libcalls", "false").unwrap(); // TODO Look this up
                 flag_builder.set("is_pic", "true").unwrap();
-                // TODO Use EGraphs
+                flag_builder.set("opt_level", "speed").unwrap();
+                flag_builder.set("regalloc_checker", "true").unwrap();
+                flag_builder.set("enable_alias_analysis", "true").unwrap();
+                //flag_builder.set("use_egraphs", "true");
+                flag_builder.set("preserve_frame_pointers", "false");
 
                 let flags = Flags::new(flag_builder);
                 builder.finish(flags).unwrap() // TODO Errorhandling
@@ -35,19 +40,13 @@ impl Compiler {
         let module = ObjectModule::new(builder.unwrap());
 
         Self {
-            translator: CodeGen { 
-                builder_context: FunctionBuilderContext::new(),
-                ctx: Context::new(),
-                data_ctx: DataContext::new(),
-                module,
-                naming_idx: 0,
-            },
+            translator: CodeGen::new(module),
 
             type_env: TypeEnv::new(&HashMap::new()), // TODO Change once we have a standard library
         }
     }
 
-    pub fn compile_file(self, config: &CompilationConfig) {
+    pub fn compile_file(self, config: &CompilationConfig, debug_config: &DebugConfig) {
         let (input_file, output_file) = extract_file_paths(config);
 
         let src = match fs::read_to_string(input_file) {
@@ -75,7 +74,8 @@ impl Compiler {
 
         let ast = parse(tokens, &mut self.type_env)?;
 
-        self.translator.translate(Some("main"), ast)?;
+        let isa = self.translator.module.target_config();
+        self.translator.translate(Some("main"), ast, FunctionOptions::external(&isa))?;
 
         let result = self.translator.module.finish();
 

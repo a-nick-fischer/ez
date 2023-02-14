@@ -1,15 +1,13 @@
 use std::{collections::HashMap, fs, mem};
 
-use cranelift::prelude::*;
 use cranelift_jit::{JITModule, JITBuilder};
-use cranelift_module::{DataContext, Module};
 
-use crate::{Config, parser::{types::type_env::TypeEnv, parse}, error::{Error, error}, lexer::lex};
+use crate::{Config, parser::{types::type_env::TypeEnv, parse}, error::{Error, error}, lexer::lex, debug_printer::{debug_tokens, debug_ast}};
 
-use super::{codegen::CodeGen, fail};
+use super::{codegen::CodeGen, fail, function_translator::FunctionOptions};
 
 pub struct Jit {
-    translator: CodeGen<JITModule>,
+    codegen: CodeGen<JITModule>,
 
     type_env: TypeEnv
 }
@@ -20,13 +18,7 @@ impl Jit {
         let module = JITModule::new(builder.unwrap());
 
         Self {
-            translator: CodeGen {
-                builder_context: FunctionBuilderContext::new(),
-                ctx: module.make_context(),
-                data_ctx: DataContext::new(),
-                module,
-                naming_idx: 0
-            },
+            codegen: CodeGen::new(module),
 
             type_env: TypeEnv::new(&HashMap::new()), // TODO Change once we have a standard library
         }
@@ -51,15 +43,21 @@ impl Jit {
     }
 
     pub fn do_run(&mut self, expr: String, config: &Config) -> Result<(), Error> {
+        // Lexing
         let tokens = lex(expr)?;
+        debug_tokens(&tokens, &config.debug_config);
 
+        // Parsing
         let ast = parse(tokens, &mut self.type_env)?;
+        debug_ast(&ast, &config.debug_config);
 
-        let func = self.translator.translate(None, ast)?;
+        // Compiling
+        let isa = self.codegen.target_config();
+        let func = self.codegen.translate(None, ast, FunctionOptions::external(&isa))?;
+        self.codegen.module.finalize_definitions()?;
 
-        self.translator.module.finalize_definitions().unwrap(); // TODO Error handling
-
-        let pointer = self.translator.module.get_finalized_function(func);
+        // Running
+        let pointer = self.codegen.module.get_finalized_function(func);
 
         unsafe {
             let fun = mem::transmute::<_, fn() -> ()>(pointer);

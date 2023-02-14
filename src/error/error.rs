@@ -52,17 +52,15 @@ pub enum Error {
 
 impl Error {
     pub fn report(&self, src: String) {
-        let source = Source::from(src.clone());
-
         let print = |r: ReportBuilder<_>| r
             .finish()
-            .eprint(source)
+            .eprint(Source::from(src.clone()))
             .expect("Beeing able to print errors");
 
         match self {
             Error::LexerError { inner } => 
                 inner
-                    .into_iter()
+                    .iter()
                     .for_each(|lex_err| 
                         print(lexer_error_report(lex_err))),
 

@@ -9,7 +9,7 @@ pub fn link(input_file: &PathBuf, config: &LinkageConfig) -> Result<(), Error> {
     if config.do_not_link { return Ok(()); }
 
     let mut command = if let Some(mut command) = config.linker_command.clone() {
-        custom_command(input_file, &mut command)
+        custom_command(&mut command)
     }
     else {
         let mut output_file = input_file.clone();
@@ -56,7 +56,7 @@ fn hosta_command(input: &PathBuf, output: &PathBuf) -> Command {
     command
 }
 
-fn custom_command(input: &PathBuf, custom: &mut Vec<String>) -> Command {
+fn custom_command(custom: &mut Vec<String>) -> Command {
     let executable = custom.pop()
         .expect("not triggering a compiler bug");
 

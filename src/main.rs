@@ -15,14 +15,14 @@ mod debug_printer;
 fn main() {
     let config = Config::parse();
 
-    if let Some(ref path) = config.file {
+    if config.file.is_some() {
         Jit::new().run_file(&config);
         return
     }
 
     match config.command {
         Some(Commands::Compile { comp_config }) =>
-            Compiler::new().compile_file(&comp_config),
+            Compiler::new().compile_file(&comp_config, &config.debug_config),
 
         None => 
             Repl::new().start(),

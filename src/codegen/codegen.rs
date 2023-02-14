@@ -1,5 +1,6 @@
 use cranelift::prelude::*;
-use cranelift::{codegen, prelude::{FunctionBuilderContext}};
+use cranelift::prelude::isa::TargetFrontendConfig;
+use cranelift::prelude::FunctionBuilderContext;
 use cranelift_module::{Module, DataContext, Linkage, DataId, FuncId, FuncOrDataId};
 
 use crate::error::{Error, error};
@@ -7,64 +8,60 @@ use crate::lexer::sig_lexer::lex_signature;
 use crate::parser::signature_parser::parse_signature;
 use crate::parser::node::Node;
 
-use super::function_translator::FunctionTranslator;
+use super::function_translator::{FunctionTranslator, FunctionOptions};
 
 pub struct CodeGen<M: Module> {
-    pub builder_context: FunctionBuilderContext,
+    builder_context: FunctionBuilderContext,
 
-    pub ctx: codegen::Context,
-
-    pub data_ctx: DataContext,
+    data_ctx: DataContext,
 
     pub module: M,
 
-    pub naming_idx: u32
+    naming_idx: u32
 }
 
 impl<M: Module> CodeGen<M> {
-    pub fn translate(&mut self, name: Option<&str>, nodes: Vec<Node>) -> Result<FuncId, Error> {
-        let mut tran = FunctionTranslator::new(self);
+    pub fn new(module: M) -> Self {
+        CodeGen {
+            builder_context: FunctionBuilderContext::new(),
+            data_ctx: DataContext::new(),
+            module,
+            naming_idx: 0
+        }
+    }
+
+    pub fn translate(&mut self, maybe_name: Option<&str>, nodes: Vec<Node>, options: FunctionOptions) -> Result<FuncId, Error> {
+        let mut tran = FunctionTranslator::new(
+            self, 
+            &mut self.builder_context,
+            options
+        );
         
         for node in nodes {
             tran.translate_node(node)?;
         }
 
-        let sig = self.module.make_signature();
-        let id = self.create_func(name, sig)?;
+        let id = if let Some(name) = maybe_name {
+            tran.to_func(name.to_string(), todo!())
+        }
+        else {
+            tran.to_anon_func(todo!())
+        }?;
 
         Ok(id)
     }
 
-    pub fn create_data(&mut self, name: String, content: Vec<u8>) -> Result<DataId, Error> {
+    pub fn create_data(&mut self, content: Vec<u8>) -> Result<DataId, Error> {
         self.data_ctx.define(content.into_boxed_slice());
 
         let id = self
             .module
-            .declare_data(&name, Linkage::Export, true, false)?;
+            .declare_anonymous_data(false, false)?;
 
         self.module
             .define_data(id, &self.data_ctx)?;
 
         // self.data_ctx.clear(); // TODO Needed?
-
-        Ok(id)
-    }
-
-    pub fn create_func(&mut self, maybe_name: Option<&str>, sig: Signature) -> Result<FuncId, Error> {
-        let id = 
-            if let Some(name) = maybe_name {
-                self
-                    .module
-                    .declare_function(name, Linkage::Export, &sig)?
-            }
-            else {
-                self
-                    .module
-                    .declare_anonymous_function(&sig)?
-            };
-        
-        self.module
-            .define_function(id, &mut self.ctx)?;
 
         Ok(id)
     }
@@ -88,6 +85,20 @@ impl<M: Module> CodeGen<M> {
     }
 
     pub fn declare_external_func(&mut self, name: &str, sig_src: &str) -> Result<FuncId, Error> {
+        let sig = self.build_signature(name)?;
+    
+        let func_id = self.module
+            .declare_function(name, Linkage::Import, &sig)
+            .expect("problem declaring function");
+    
+        return Ok(func_id)
+    }
+
+    pub fn target_config(&self) -> TargetFrontendConfig {
+        self.module.target_config()
+    }
+
+    pub fn build_signature(&self, sig_src: &str) -> Result<Signature, Error> {
         let lexed_sig = lex_signature(sig_src)?;
         let (parsed_args, parsed_returns) = parse_signature(lexed_sig);
     
@@ -98,11 +109,7 @@ impl<M: Module> CodeGen<M> {
     
         let returns: Vec<AbiParam> = parsed_returns.into();
         sig.returns.extend(returns);
-    
-        let func_id = self.module
-            .declare_function(name, Linkage::Import, &sig)
-            .expect("problem declaring function");
-    
-        return Ok(func_id)
+
+        Ok(sig)
     }
 }

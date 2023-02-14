@@ -4,13 +4,14 @@ use ariadne::{Color, Fmt};
 use cranelift::prelude::AbiParam;
 use cranelift_module::ModuleError;
 
-use crate::{error::Error, parser::types::{types::Type, typelist::TypeList}};
+use crate::{error::Error, parser::types::{types::Type, typelist::TypeList, NUMBER_TYPE_NAME}};
 
 pub mod compiler;
 pub mod jit;
 pub mod codegen;
 pub mod external_linker;
 pub mod function_translator;
+pub mod jit_stack_ffi;
 
 fn fail(err: Error, src: String) -> ! {
     err.report(src);
@@ -29,7 +30,7 @@ fn pointer_type() -> cranelift::prelude::Type {
 impl Into<cranelift::prelude::Type> for Type {
     fn into(self) -> cranelift::prelude::Type {
         match self {
-            Type::Kind(name, _) if name == "num" => cranelift::prelude::types::F64,
+            Type::Kind(name, _) if name == NUMBER_TYPE_NAME => cranelift::prelude::types::F64,
 
             Type::Kind(_, _) => pointer_type(),
 

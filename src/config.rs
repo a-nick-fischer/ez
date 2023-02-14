@@ -6,7 +6,7 @@ use clap::{Parser, command, Subcommand, Args};
 #[command(author, version, about, long_about = None)]
 pub struct Config {
     #[clap(flatten)]
-    debug_config: DebugConfig,
+    pub debug_config: DebugConfig,
 
     /// (Development) No code is actually executed. Useful pared with the emit options 
     #[arg(long)]
@@ -41,7 +41,7 @@ pub struct DebugConfig {
     /// (Development) If the emited tokens, ast-nodes, clif etc. should be outputed
     /// to separate files instead of printed. For compiling or running files only.
     #[arg(long)]
-    emits_to_files: bool
+    pub emits_to_files: bool
 }
 
 #[derive(Subcommand, Debug)]

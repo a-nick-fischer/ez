@@ -23,6 +23,8 @@ impl<'a> Jit<'a> {
             codegen: CodeGen::new(module),
 
             type_env: TypeEnv::new(&HashMap::new()), // TODO Change once we have a standard library
+
+            state: RawJitState::new()
         }
     }
 
@@ -51,9 +53,9 @@ impl<'a> Jit<'a> {
 
         // Translating
         let isa = self.codegen.target_config();
-        let func = self.codegen.translate(ast, FunctionOptions::external(&isa))?;
+        let mut func = self.codegen.translate(ast, FunctionOptions::external(&isa))?;
 
-        let id = func.to_anon_func("(jitstate --)")?;
+        let id = func.to_anon_func("(jitstate --)".parse()?)?;
         
         // Codegenerating
         self.codegen.module.finalize_definitions()?;
@@ -76,9 +78,9 @@ impl<'a> Jit<'a> {
 
         // Translating
         let isa = self.codegen.target_config();
-        let func = self.codegen.translate(ast, FunctionOptions::external(&isa))?;
+        let mut func = self.codegen.translate(ast, FunctionOptions::external(&isa))?;
 
-        let id = func.to_anon_func("(--)")?;
+        let id = func.to_anon_func("(--)".parse()?)?;
         
         // Codegenerating
         self.codegen.module.finalize_definitions()?;

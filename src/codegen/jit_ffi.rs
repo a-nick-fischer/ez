@@ -4,10 +4,16 @@ use crate::{parser::types::{type_env::TypeEnv, types::Type, *}, error::Error};
 
 // The struct is only allocated inside our Jit which should in theory align
 // this thing
-#[repr(C)]
+#[repr(C, packed)]
 pub struct RawJitState<'a> {
-    stack: &'a [*const usize],
-    vars: &'a [*const usize]
+    stack: Option<&'a [*const usize]>,
+    vars: Option<&'a [*const usize]>
+}
+
+impl RawJitState<'_> {
+    pub fn new() -> Self {
+        RawJitState { stack: None, vars: None }
+    }
 }
 
 #[derive(Debug)]

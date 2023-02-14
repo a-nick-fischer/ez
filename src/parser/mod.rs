@@ -145,7 +145,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                 typecheck_func_return(token, sig.returns().clone(), &mut new_env)?;
 
                 let node = Node::Literal { 
-                    typ: sig.into(),
+                    typ: sig.clone().into(),
                     value: Literal::Function(sig, ast),
                     token: token.clone(), 
                     stack_size: type_env.stack.len()

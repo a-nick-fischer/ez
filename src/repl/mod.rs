@@ -39,7 +39,7 @@ impl<'a> Repl<'a> {
     }
 
     fn run(&mut self, buffer: String) {
-        match self.jit.run_saving(buffer, &self.config) {
+        match self.jit.run_saving(buffer.clone(), &self.config) {
             Ok(_) => {
                 let state = self.jit.jit_state();
 

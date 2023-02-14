@@ -5,7 +5,7 @@ pub mod types;
 
 use crate::{lexer::token::Token, error::Error};
 
-use self::{node::{Node, Literal}, types::{*, type_env::TypeEnv, typelist::TypeList, types::Type}, signature_parser::parse_signature};
+use self::{node::{Node, Literal}, types::{*, type_env::TypeEnv, typelist::TypeList, types::Type}, signature_parser::TypedSignature};
 
 pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Error> {
     let mut typed_stack = Vec::new();
@@ -132,24 +132,21 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                 }                
             },
 
-            Token::Function { sig, body, .. } => {
-                let (args, ret) = parse_signature(sig);
+            Token::Function { sig: sig_src, body, .. } => {
+                let sig: TypedSignature = sig_src.into();
 
                 let mut new_env = type_env.clone();
-                new_env.stack = args.clone();
+                new_env.stack = sig.arguments().clone();
 
                 // Typecheck args
                 let ast = parse(body, &mut new_env)?;
 
                 // Typecheck return
-                typecheck_func_return(token, ret.clone(), &mut new_env)?;
+                typecheck_func_return(token, sig.returns().clone(), &mut new_env)?;
 
                 let node = Node::Literal { 
-                    typ: func_type(
-                        args.vec().clone(), 
-                        ret.vec().clone()
-                    ),
-                    value: Literal::Function(ast),
+                    typ: sig.into(),
+                    value: Literal::Function(sig, ast),
                     token: token.clone(), 
                     stack_size: type_env.stack.len()
                 };

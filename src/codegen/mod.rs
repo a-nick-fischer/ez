@@ -11,7 +11,7 @@ pub mod jit;
 pub mod codegen;
 pub mod external_linker;
 pub mod function_translator;
-pub mod jit_stack_ffi;
+pub mod jit_ffi;
 
 fn fail(err: Error, src: String) -> ! {
     err.report(src);

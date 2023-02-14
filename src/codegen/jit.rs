@@ -2,17 +2,19 @@ use std::{collections::HashMap, fs, mem};
 
 use cranelift_jit::{JITModule, JITBuilder};
 
-use crate::{Config, parser::{types::type_env::TypeEnv, parse}, error::{Error, error}, lexer::lex, debug_printer::{debug_tokens, debug_ast}};
+use crate::{Config, parser::{types::type_env::TypeEnv, parse, node::Node}, error::{Error, error}, lexer::lex, debug_printer::{debug_tokens, debug_ast}};
 
-use super::{codegen::CodeGen, fail, function_translator::FunctionOptions};
+use super::{codegen::CodeGen, fail, function_translator::FunctionOptions, jit_ffi::{RawJitState, JitState}};
 
-pub struct Jit {
+pub struct Jit<'a> {
     codegen: CodeGen<JITModule>,
 
-    type_env: TypeEnv
+    type_env: TypeEnv,
+
+    state: RawJitState<'a>
 }
 
-impl Jit {
+impl<'a> Jit<'a> {
     pub fn new() -> Self {
         let builder = JITBuilder::new(cranelift_module::default_libcall_names());
         let module = JITModule::new(builder.unwrap());
@@ -25,24 +27,73 @@ impl Jit {
     }
 
     pub fn run_file(&mut self, config: &Config){
-        let input_file = config.file.clone().expect("not triggering a compiler bug");
+        let input_file = config.file.clone()
+            .expect("not triggering a compiler bug");
 
         match fs::read_to_string(input_file) {
-            Ok(src) => self.run_expr(src, config),
+            Ok(src) => self.run_file_content(src, config),
 
             Err(err) => fail(error(err), "".to_string()),
         }
     }
 
-    pub fn run_expr(&mut self, expr: String, config: &Config){
-        match self.do_run(expr.clone(), config) {
+    fn run_file_content(&mut self, expr: String, config: &Config){
+        match self.run(expr.clone(), config) {
             Ok(_) => todo!(),
 
             Err(errs) => fail(errs, expr),
         }
     }
 
-    pub fn do_run(&mut self, expr: String, config: &Config) -> Result<(), Error> {
+    pub fn run_saving(&mut self, expr: String, config: &Config) -> Result<(), Error> {
+        // Parsing
+        let ast = self.lex_and_parse(expr, config)?;
+
+        // Translating
+        let isa = self.codegen.target_config();
+        let func = self.codegen.translate(ast, FunctionOptions::external(&isa))?;
+
+        let id = func.to_anon_func("(jitstate --)")?;
+        
+        // Codegenerating
+        self.codegen.module.finalize_definitions()?;
+        let pointer = self.codegen.module.get_finalized_function(id);
+
+        // Running
+        unsafe {
+            let state_ptr: *const _ = &self.state;
+
+            let fun = mem::transmute::<_, fn(*const RawJitState) -> ()>(pointer);
+            fun(state_ptr)
+        }
+        
+        Ok(())
+    }
+
+    pub fn run(&mut self, expr: String, config: &Config) -> Result<(), Error> {
+        // Parsing
+        let ast = self.lex_and_parse(expr, config)?;
+
+        // Translating
+        let isa = self.codegen.target_config();
+        let func = self.codegen.translate(ast, FunctionOptions::external(&isa))?;
+
+        let id = func.to_anon_func("(--)")?;
+        
+        // Codegenerating
+        self.codegen.module.finalize_definitions()?;
+        let pointer = self.codegen.module.get_finalized_function(id);
+
+        // Running
+        unsafe {
+            let fun = mem::transmute::<_, fn() -> ()>(pointer);
+            fun()
+        }
+        
+        Ok(())
+    }
+
+    fn lex_and_parse(&mut self, expr: String, config: &Config) -> Result<Vec<Node>, Error> {
         // Lexing
         let tokens = lex(expr)?;
         debug_tokens(&tokens, &config.debug_config);
@@ -51,23 +102,14 @@ impl Jit {
         let ast = parse(tokens, &mut self.type_env)?;
         debug_ast(&ast, &config.debug_config);
 
-        // Compiling
-        let isa = self.codegen.target_config();
-        let func = self.codegen.translate(None, ast, FunctionOptions::external(&isa))?;
-        self.codegen.module.finalize_definitions()?;
-
-        // Running
-        let pointer = self.codegen.module.get_finalized_function(func);
-
-        unsafe {
-            let fun = mem::transmute::<_, fn() -> ()>(pointer);
-            fun();
-        }
-
-        Ok(())
+        Ok(ast)
     }
 
     pub fn defined_symbols(&self) -> impl Iterator<Item = &String> {
         self.type_env.bindings.keys()
+    }
+
+    pub fn jit_state(&self) -> JitState {
+        todo!()
     }
 }

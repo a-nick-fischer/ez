@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cranelift::{prelude::{FunctionBuilder, Value, Variable, EntityRef, InstBuilder, FunctionBuilderContext, isa::{CallConv, TargetFrontendConfig}}, codegen::Context};
 use cranelift_module::{Module, Linkage, FuncId};
 
-use crate::{parser::{node::{Node, Literal}, types::{types::Type, self}}, error::{Error, error}};
+use crate::{parser::{node::{Node, Literal}, types::{types::Type, self}, signature_parser::TypedSignature}, error::{Error, error}};
 
 use super::{codegen::CodeGen, pointer_type};
 
@@ -66,14 +66,14 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         }
     }
 
-    pub fn to_func(&mut self, name: String, sig_src: &str) -> Result<FuncId, Error> {
-        let mut sig = self.codegen.build_signature(sig_src)?;
+    pub fn to_func(&mut self, name: &str, sig: TypedSignature) -> Result<FuncId, Error> {
+        let mut sig = self.codegen.build_cranelift_signature(sig)?;
         sig.call_conv = self.options.call_conv;
 
         let id = self
             .codegen
             .module
-            .declare_function(name.as_str(), self.options.linkage, &sig)?;
+            .declare_function(name, self.options.linkage, &sig)?;
 
         self
             .codegen
@@ -83,8 +83,8 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         Ok(id)
     }
 
-    pub fn to_anon_func(&mut self, sig_src: &str) -> Result<FuncId, Error> {
-        let mut sig = self.codegen.build_signature(sig_src)?;
+    pub fn to_anon_func(&mut self, sig: TypedSignature) -> Result<FuncId, Error> {
+        let mut sig = self.codegen.build_cranelift_signature(sig)?;
         sig.call_conv = self.options.call_conv;
 
         let id = self
@@ -155,13 +155,15 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                     todo!() // TODO No fcking clue how to translate this one..
                 },
     
-                (types::FUNC_TYPE_NAME, Literal::Function(ast)) => {
-                    let func = self.codegen.translate(None, ast, FunctionOptions::internal())?;
+                (types::FUNC_TYPE_NAME, Literal::Function(sig, ast)) => {
+                    let func = self.codegen.translate(ast, FunctionOptions::internal())?;
+
+                    let id = func.to_anon_func(sig)?;
 
                     let local_callee = self
                         .codegen
                         .module
-                        .declare_func_in_func(func, self.builder.func);
+                        .declare_func_in_func(id, self.builder.func);
 
                     Ok(self.builder.ins().func_addr(pointer_type(), local_callee))
                 },

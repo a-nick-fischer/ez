@@ -5,7 +5,7 @@ use cranelift_module::{Module, DataContext, Linkage, DataId, FuncId, FuncOrDataI
 
 use crate::error::{Error, error};
 use crate::lexer::sig_lexer::lex_signature;
-use crate::parser::signature_parser::parse_signature;
+use crate::parser::signature_parser::TypedSignature;
 use crate::parser::node::Node;
 
 use super::function_translator::{FunctionTranslator, FunctionOptions};
@@ -30,7 +30,7 @@ impl<M: Module> CodeGen<M> {
         }
     }
 
-    pub fn translate(&mut self, maybe_name: Option<&str>, nodes: Vec<Node>, options: FunctionOptions) -> Result<FuncId, Error> {
+    pub fn translate(&mut self, nodes: Vec<Node>, options: FunctionOptions) -> Result<FunctionTranslator<M>, Error> {
         let mut tran = FunctionTranslator::new(
             self, 
             &mut self.builder_context,
@@ -41,14 +41,7 @@ impl<M: Module> CodeGen<M> {
             tran.translate_node(node)?;
         }
 
-        let id = if let Some(name) = maybe_name {
-            tran.to_func(name.to_string(), todo!())
-        }
-        else {
-            tran.to_anon_func(todo!())
-        }?;
-
-        Ok(id)
+        Ok(tran)
     }
 
     pub fn create_data(&mut self, content: Vec<u8>) -> Result<DataId, Error> {
@@ -85,7 +78,7 @@ impl<M: Module> CodeGen<M> {
     }
 
     pub fn declare_external_func(&mut self, name: &str, sig_src: &str) -> Result<FuncId, Error> {
-        let sig = self.build_signature(name)?;
+        let sig = self.parse_cranelift_signature(sig_src)?;
     
         let func_id = self.module
             .declare_function(name, Linkage::Import, &sig)
@@ -98,18 +91,21 @@ impl<M: Module> CodeGen<M> {
         self.module.target_config()
     }
 
-    pub fn build_signature(&self, sig_src: &str) -> Result<Signature, Error> {
+    pub fn parse_cranelift_signature(&self, sig_src: &str) -> Result<Signature, Error> {
         let lexed_sig = lex_signature(sig_src)?;
-        let (parsed_args, parsed_returns) = parse_signature(lexed_sig);
     
-        let mut sig = self.module.make_signature();
-    
-        let params: Vec<AbiParam> = parsed_args.into();
-        sig.params.extend(params);
-    
-        let returns: Vec<AbiParam> = parsed_returns.into();
-        sig.returns.extend(returns);
+        self.build_cranelift_signature(lexed_sig.into())
+    }
 
-        Ok(sig)
+    pub fn build_cranelift_signature(&self, sig: TypedSignature) -> Result<Signature, Error> {
+        let mut cranelift_cig = self.module.make_signature();
+    
+        let params: Vec<AbiParam> = sig.arguments().clone().into();
+        cranelift_cig.params.extend(params);
+    
+        let returns: Vec<AbiParam> = sig.returns().clone().into();
+        cranelift_cig.returns.extend(returns);
+
+        Ok(cranelift_cig)
     }
 }

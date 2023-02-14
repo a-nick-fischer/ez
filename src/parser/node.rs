@@ -1,6 +1,6 @@
 use crate::{error::Error, lexer::token::Token};
 
-use super::{type_env::TypeEnv, typelist::TypeList, types::types::Type};
+use super::{type_env::TypeEnv, typelist::TypeList, types::types::Type, signature_parser::TypedSignature};
 
 #[derive(Clone, Debug)]
 pub enum Node {
@@ -42,7 +42,7 @@ pub enum Literal {
 
     List(Vec<Node>),
 
-    Function(Vec<Node>)
+    Function(TypedSignature, Vec<Node>)
 }
 
 impl Node {

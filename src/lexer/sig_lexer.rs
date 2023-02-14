@@ -3,9 +3,9 @@ use chumsky::prelude::*;
 use crate::error::Error;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct Signature(Vec<SignatureElement>, Vec<SignatureElement>);
+pub struct LexedSignature(Vec<SignatureElement>, Vec<SignatureElement>);
 
-impl Signature {
+impl LexedSignature {
     pub fn get_args(&self) -> &Vec<SignatureElement> {
         &self.0
     }
@@ -36,7 +36,7 @@ fn ident_lexer() -> impl Parser<char, String, Error = Simple<char>> + Clone {
             .collect::<String>()
 }
 
-pub fn sig_lexer() -> impl Parser<char, Signature, Error = Simple<char>> + Clone {
+pub fn sig_lexer() -> impl Parser<char, LexedSignature, Error = Simple<char>> + Clone {
     let elem = recursive(|func|{
         let var = just('\'')
             .ignore_then(ident_lexer())
@@ -59,10 +59,10 @@ pub fn sig_lexer() -> impl Parser<char, Signature, Error = Simple<char>> + Clone
         .then_ignore(just("--"))
         .then(side)
         .delimited_by(just("("), just(")"))
-        .map(|(args, ret)| Signature(args, ret))
+        .map(|(args, ret)| LexedSignature(args, ret))
 }
 
-pub fn lex_signature(src: &str) -> Result<Signature, Error> {
+pub fn lex_signature(src: &str) -> Result<LexedSignature, Error> {
     let (result, errs) = sig_lexer().parse_recovery_verbose(src.to_string());
 
     match result {

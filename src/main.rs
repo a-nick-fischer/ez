@@ -25,6 +25,6 @@ fn main() {
             Compiler::new().compile_file(&comp_config, &config.debug_config),
 
         None => 
-            Repl::new().start(),
+            Repl::new(config).start(),
     }
 }

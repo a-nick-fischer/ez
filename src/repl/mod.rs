@@ -2,18 +2,20 @@
 
 use reedline::{DefaultPrompt, Reedline, Signal};
 
-use crate::codegen::jit::Jit;
+use crate::{codegen::jit::Jit, config::Config};
 
-pub struct Repl {
+pub struct Repl<'a> {
     line_editor: Reedline,
-    jit: Jit
+    jit: Jit<'a>,
+    config: Config
 }
 
-impl Repl {
-    pub fn new() -> Self {
+impl<'a> Repl<'a> {
+    pub fn new(config: Config) -> Self {
         Repl {
             line_editor: Reedline::create(),
-            jit: Jit::new()
+            jit: Jit::new(),
+            config
         }
     }
 
@@ -24,9 +26,7 @@ impl Repl {
             let sig = self.line_editor.read_line(&prompt);
             
             match sig {
-                Ok(Signal::Success(buffer)) => {
-                    println!("We processed: {}", buffer);
-                },
+                Ok(Signal::Success(buffer)) => self.run(buffer),
 
                 Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
                     println!("\nAborted!");
@@ -35,6 +35,19 @@ impl Repl {
 
                 _ => continue
             }
+        }
+    }
+
+    fn run(&mut self, buffer: String) {
+        match self.jit.run_saving(buffer, &self.config) {
+            Ok(_) => {
+                let state = self.jit.jit_state();
+
+                println!("{state}")
+            },
+
+            Err(err) => 
+                err.report(buffer),
         }
     }
 }

@@ -8,7 +8,7 @@ use crate::{error::Error, parser::types::{typ::Type, typelist::TypeList, NUMBER_
 
 pub mod compiler;
 pub mod jit;
-pub mod codegen;
+pub mod codegen_module;
 pub mod external_linker;
 pub mod function_translator;
 pub mod jit_ffi;

@@ -5,10 +5,10 @@ use cranelift_module::Module;
 
 use crate::{Config, parser::{types::type_env::TypeEnv, parse, node::Node}, error::{Error, error}, lexer::lex, debug_printer::{debug_tokens, debug_ast}};
 
-use super::{codegen::CodeGen, fail, function_translator::FunctionOptions, jit_ffi::{RawJitState, JitState}};
+use super::{codegen_module::CodeGenModule, fail, function_translator::FunctionOptions, jit_ffi::{RawJitState, JitState}};
 
 pub struct Jit<'a> {
-    codegen: CodeGen<JITModule>,
+    codegen: CodeGenModule<JITModule>,
 
     type_env: TypeEnv,
 
@@ -21,7 +21,7 @@ impl<'a> Jit<'a> {
         let module = JITModule::new(builder.unwrap());
 
         Self {
-            codegen: CodeGen::new(module),
+            codegen: CodeGenModule::new(module),
 
             type_env: TypeEnv::new(&HashMap::new()), // TODO Change once we have a standard library
 
@@ -58,7 +58,7 @@ impl<'a> Jit<'a> {
 
         let id = self.codegen
             .translate_ast(ast)?
-            .to_anon_func("(jitstate --)".parse()?, options)?;
+            .finish_anon_func("(jitstate --)".parse()?, options)?;
         
         // Codegenerating
         self.codegen.module.finalize_definitions()?;
@@ -85,7 +85,7 @@ impl<'a> Jit<'a> {
 
         let id = self.codegen
             .translate_ast(ast)?
-            .to_anon_func("(--)".parse()?, options)?;
+            .finish_anon_func("(--)".parse()?, options)?;
         
         // Codegenerating
         self.codegen.module.finalize_definitions()?;

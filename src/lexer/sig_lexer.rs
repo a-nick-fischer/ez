@@ -40,7 +40,7 @@ pub fn sig_lexer() -> impl Parser<char, LexedSignature, Error = Simple<char>> + 
     let elem = recursive(|func|{
         let var = just('\'')
             .ignore_then(ident_lexer())
-            .map(|name| SignatureElement::Variable(name));
+            .map(SignatureElement::Variable);
 
         let polytypes = func.padded()
             .repeated()
@@ -50,7 +50,7 @@ pub fn sig_lexer() -> impl Parser<char, LexedSignature, Error = Simple<char>> + 
             .then(polytypes)
             .map(|(name, typs)| SignatureElement::Kind(name, typs));
 
-        var.clone().or(kind.clone())
+        var.or(kind.clone())
     });
 
     let side = elem.padded().repeated();

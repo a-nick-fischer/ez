@@ -1,6 +1,6 @@
 use cranelift_module::Module;
 
-use crate::{parser::signature_parser::TypedSignature, codegen::{function_translator::FunctionTranslator, codegen::CodeGen}, error::Error};
+use crate::{parser::signature_parser::TypedSignature, codegen::{function_translator::FunctionTranslator}};
 
 trait StdFn<'a> {
     fn name(&self) -> &'a str;

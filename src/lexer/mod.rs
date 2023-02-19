@@ -11,8 +11,7 @@ pub mod token;
 fn preprocess_tokens(tokens: Vec<Token>) -> Vec<Token> {
     tokens
         .split(|token| matches!(token, Token::Newline))
-        .map(|vec| vec.into_iter().rev().cloned().collect::<Vec<Token>>())
-        .flatten()
+        .flat_map(|vec| vec.iter().rev().cloned().collect::<Vec<Token>>())
         .collect()
 }
 
@@ -20,5 +19,5 @@ pub fn lex(src: String) -> Result<Vec<Token>, Error> {
     let (tokens, errs) = lexer().parse_recovery_verbose(src);
 
     tokens.map(preprocess_tokens)
-        .ok_or_else(|| Error::Lexer { inner: errs })
+        .ok_or(Error::Lexer { inner: errs })
 }

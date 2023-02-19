@@ -9,15 +9,15 @@ use crate::parser::node::Node;
 
 use super::function_translator::{FunctionTranslator, TranslatedFunction};
 
-pub struct CodeGen<M: Module> {
+pub struct CodeGenModule<M: Module> {
     data_ctx: DataContext,
 
     pub module: M,
 }
 
-impl<M: Module> CodeGen<M> {
+impl<M: Module> CodeGenModule<M> {
     pub fn new(module: M) -> Self {
-        CodeGen {
+        CodeGenModule {
             data_ctx: DataContext::new(),
             module
         }

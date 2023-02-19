@@ -5,7 +5,7 @@ use cranelift_module::{Module, Linkage, FuncId};
 
 use crate::{parser::{node::{Node, Literal}, types::{typ::Type, self}, signature_parser::TypedSignature}, error::{Error, error}};
 
-use super::{pointer_type, codegen::CodeGen};
+use super::{pointer_type, codegen_module::CodeGenModule};
 
 pub struct FunctionOptions {
     call_conv: CallConv,
@@ -29,13 +29,13 @@ impl FunctionOptions {
 }
 
 pub struct TranslatedFunction<'a, M: Module> {
-    codegen: &'a mut CodeGen<M>,
+    codegen: &'a mut CodeGenModule<M>,
 
     pub context: Context
 }
 
 impl<'a, M: Module> TranslatedFunction<'a, M> {
-    pub fn to_func(mut self, name: &str, sig: TypedSignature, options: FunctionOptions) -> Result<FuncId, Error> {
+    pub fn finish_func(mut self, name: &str, sig: TypedSignature, options: FunctionOptions) -> Result<FuncId, Error> {
         let mut sig = self.codegen.build_cranelift_signature(sig)?;
         sig.call_conv = options.call_conv;
 
@@ -52,7 +52,7 @@ impl<'a, M: Module> TranslatedFunction<'a, M> {
         Ok(id)
     }
 
-    pub fn to_anon_func(mut self, sig: TypedSignature, options: FunctionOptions) -> Result<FuncId, Error> {
+    pub fn finish_anon_func(mut self, sig: TypedSignature, options: FunctionOptions) -> Result<FuncId, Error> {
         let mut sig = self.codegen.build_cranelift_signature(sig)?;
         sig.call_conv = options.call_conv;
 
@@ -71,7 +71,7 @@ impl<'a, M: Module> TranslatedFunction<'a, M> {
 }
 
 pub struct FunctionTranslator<'a, M: Module> {
-    codegen: &'a mut CodeGen<M>,
+    codegen: &'a mut CodeGenModule<M>,
 
     variables: HashMap<String, Variable>,
 
@@ -80,7 +80,7 @@ pub struct FunctionTranslator<'a, M: Module> {
 
 impl<'a, M: Module> FunctionTranslator<'a, M> {
     pub fn new(
-        codegen: &'a mut CodeGen<M>
+        codegen: &'a mut CodeGenModule<M>
     ) -> Self {
         FunctionTranslator { 
             codegen,
@@ -119,7 +119,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
     
             Node::Variable { name, .. } => {
                 let var = self.variables.get(&name)
-                    .ok_or(error(format!("Variable {name} not found - yes this is a compiler bug")))?;
+                    .ok_or_else(|| error(format!("Variable {name} not found - yes this is a compiler bug")))?;
 
                 let val = builder.use_var(*var);
                 self.stack.push(val);
@@ -165,7 +165,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                 (types::FUNC_TYPE_NAME, Literal::Function(sig, ast)) => {
                     let id = FunctionTranslator::new(self.codegen)
                         .with_body(ast)?
-                        .to_anon_func(sig, FunctionOptions::internal())?;
+                        .finish_anon_func(sig, FunctionOptions::internal())?;
 
                     let local_callee = self
                         .codegen
@@ -188,7 +188,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         let local_callee = self
             .codegen
             .module
-            .declare_func_in_func(func_id, &mut builder.func);
+            .declare_func_in_func(func_id, builder.func);
 
         let slice = &self.stack[args_len..];
         let call = builder.ins().call(local_callee, slice);

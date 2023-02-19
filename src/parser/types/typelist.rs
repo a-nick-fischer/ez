@@ -1,4 +1,4 @@
-use std::fmt::{Display, write};
+use std::fmt::Display;
 
 use super::{typ::Type, type_env::TypeEnv};
 
@@ -75,7 +75,7 @@ impl From<Vec<Type>> for TypeList {
 impl Display for TypeList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let msg = self.vec()
-            .into_iter()
+            .iter()
             .map(|t| t.to_string())
             .collect::<Vec<String>>()
             .join(" ");

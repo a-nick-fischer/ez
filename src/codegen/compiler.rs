@@ -7,9 +7,9 @@ use cranelift_object::{ObjectModule, ObjectBuilder};
 
 use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}};
 
-use super::{codegen::CodeGen, external_linker::link, success, fail, function_translator::FunctionOptions};
+use super::{codegen_module::CodeGenModule, external_linker::link, success, fail, function_translator::FunctionOptions};
 pub struct Compiler {
-    translator: CodeGen<ObjectModule>,
+    translator: CodeGenModule<ObjectModule>,
 
     type_env: TypeEnv
 }
@@ -25,8 +25,8 @@ impl Compiler {
                 flag_builder.set("opt_level", "speed").unwrap();
                 flag_builder.set("regalloc_checker", "true").unwrap();
                 flag_builder.set("enable_alias_analysis", "true").unwrap();
-                //flag_builder.set("use_egraphs", "true");
-                flag_builder.set("preserve_frame_pointers", "false");
+                //flag_builder.set("use_egraphs", "true").unwrap();
+                flag_builder.set("preserve_frame_pointers", "false").unwrap();
 
                 let flags = Flags::new(flag_builder);
                 builder.finish(flags).unwrap() // TODO Errorhandling
@@ -40,7 +40,7 @@ impl Compiler {
         let module = ObjectModule::new(builder.unwrap());
 
         Self {
-            translator: CodeGen::new(module),
+            translator: CodeGenModule::new(module),
 
             type_env: TypeEnv::new(&HashMap::new()), // TODO Change once we have a standard library
         }
@@ -60,7 +60,7 @@ impl Compiler {
         let result = compilation_result
             .and_then(|_| link(&output_file, &config.linkage))
             .and_then(|_| fs::remove_file(&output_file) // Delete object file, not the actual output executable
-                .map_err(|err| error(err)));
+                .map_err(error));
 
         match result {
             Ok(_) => success(),
@@ -79,15 +79,15 @@ impl Compiler {
 
         self.translator
             .translate_ast(ast)?
-            .to_func("main", "(--)".parse()?, options); // TODO Must we accept args and return a code?
+            .finish_func("main", "(--)".parse()?, options)?; // TODO Must we accept args and return a code?
 
         let result = self.translator.module.finish();
 
         let bytes = result.emit()
-            .map_err(|err| error(err))?;
+            .map_err(error)?;
 
         fs::write(outfile, bytes)
-            .map_err(|err| error(err))
+            .map_err(error)
     }
 }
 

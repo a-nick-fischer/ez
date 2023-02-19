@@ -2,7 +2,7 @@ use std::{collections::HashMap, cell::RefCell, rc::Rc, str::FromStr};
 
 use crate::{lexer::sig_lexer::{LexedSignature, SignatureElement, lex_signature}, error::Error};
 
-use super::{types::{types::{VarContent, Type}, typelist::TypeList, *}};
+use super::{types::{typ::{VarContent, Type}, typelist::TypeList, *}};
 
 #[derive(Debug, Clone)]
 pub struct TypedSignature(pub TypeList, pub TypeList);
@@ -24,7 +24,7 @@ impl TypedSignature {
 fn build_signature(elems: Vec<SignatureElement>, vars: &mut HashMap<String, VarContent>) -> Vec<Type> {
     let convert = |elem| match elem {
         SignatureElement::Kind(name, inner) =>
-            typ(&name.to_string(), build_signature(inner, vars)),
+            typ(&name, build_signature(inner, vars)),
 
         SignatureElement::Variable(name) => {
             if let Some(content) = vars.get(&name) {
@@ -54,11 +54,11 @@ impl From<LexedSignature> for TypedSignature {
     }
 }
 
-impl Into<Type> for TypedSignature {
-    fn into(self) -> Type {
+impl From<TypedSignature> for Type {
+    fn from(val: TypedSignature) -> Self {
         func_type(
-            self.0.vec().clone(),
-            self.1.vec().clone()
+            val.0.vec().clone(),
+            val.1.vec().clone()
         )
     }
 }

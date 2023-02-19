@@ -5,19 +5,19 @@ pub mod types;
 
 use crate::{lexer::token::Token, error::Error};
 
-use self::{node::{Node, Literal}, types::{*, type_env::TypeEnv, typelist::TypeList, types::Type}, signature_parser::TypedSignature};
+use self::{node::{Node, Literal}, types::{*, type_env::TypeEnv, typelist::TypeList, typ::Type}, signature_parser::TypedSignature};
 
-pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Error> {
+pub fn parse(mut tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Error> {
     let mut typed_stack = Vec::new();
-    let mut tokens = tokens.clone();
 
-    let apply = |node: Node, type_env: &mut TypeEnv, typed_stack: &mut Vec<Node>| {
-        node.apply(type_env);
+    let apply = |node: Node, type_env: &mut TypeEnv, typed_stack: &mut Vec<Node>| -> Result<(), Error> {
+        node.apply(type_env)?;
         typed_stack.push(node);
+        Ok(())
     };
     
     while !tokens.is_empty() {
-        let ref token = tokens.pop().unwrap();
+        let token = &tokens.pop().unwrap();
 
         match token.clone() {
             Token::Number { value, .. } => apply(
@@ -29,7 +29,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                 },
                 type_env,
                 &mut typed_stack
-            ),
+            )?,
             
             Token::Quote { value, .. } => apply(
                 Node::Literal { 
@@ -40,7 +40,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                 },
                 type_env,
                 &mut typed_stack
-            ),
+            )?,
             
             Token::Ident { ref value, .. } => {
                 let typ = type_env.bindings.get(value)
@@ -52,7 +52,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                         token: token.clone(),
                         arguments: args,
                         returns: ret,
-                        stack_size:  type_env.stack.len()
+                        stack_size: type_env.stack.len()
                     }
                 }
                 else {
@@ -60,11 +60,11 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                         name: value.clone(), 
                         token: token.clone(), 
                         typ: typ.clone(),
-                        stack_size:  type_env.stack.len()
+                        stack_size: type_env.stack.len()
                     }
                 };
 
-                apply(node, type_env, &mut typed_stack);
+                apply(node, type_env, &mut typed_stack)?;
             },
             
             Token::GetIdent { ref value, .. } => {
@@ -78,7 +78,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                     stack_size:  type_env.stack.len()
                 };
 
-                apply(node, type_env, &mut typed_stack);
+                apply(node, type_env, &mut typed_stack)?;
             },
 
             Token::Assigment { ref value, .. } => {
@@ -90,7 +90,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                         stack_size:  type_env.stack.len()
                     };
 
-                    apply(node, type_env, &mut typed_stack);
+                    apply(node, type_env, &mut typed_stack)?;
                 }
                 else {
                     return Err(Error::AssigmentEmptyStack { token: token.clone() })
@@ -102,11 +102,11 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                     typ: var_type("a", None),
                     value: Literal::List(Vec::new()),
                     token: token.clone(),
-                    stack_size:  type_env.stack.len()
+                    stack_size: type_env.stack.len()
                 },
                 type_env,
                 &mut typed_stack
-            ),
+            )?,
 
             Token::List { ref value, .. } => {
                 let mut new_env = type_env.clone();
@@ -124,7 +124,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                         },
                         type_env,
                         &mut typed_stack
-                    ),
+                    )?,
 
                     Err((expected, got)) => {
                         return Err(Error::WrongTypeInList { token: token.clone(), expected, got });
@@ -151,7 +151,7 @@ pub fn parse(tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Er
                     stack_size: type_env.stack.len()
                 };
                 
-                apply(node, type_env, &mut typed_stack);
+                apply(node, type_env, &mut typed_stack)?;
             },
 
             Token::Newline => unreachable!(),

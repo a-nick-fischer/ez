@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc, collections::HashMap};
 
-use super::{typelist::TypeList, types::Type};
+use super::{typelist::TypeList, typ::Type};
 
 pub type TypeBindings = HashMap<String, Type>;
 

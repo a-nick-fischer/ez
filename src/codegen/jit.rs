@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fs, mem};
 
 use cranelift_jit::{JITModule, JITBuilder};
+use cranelift_module::Module;
 
 use crate::{Config, parser::{types::type_env::TypeEnv, parse, node::Node}, error::{Error, error}, lexer::lex, debug_printer::{debug_tokens, debug_ast}};
 
@@ -52,10 +53,12 @@ impl<'a> Jit<'a> {
         let ast = self.lex_and_parse(expr, config)?;
 
         // Translating
-        let isa = self.codegen.target_config();
-        let mut func = self.codegen.translate(ast, FunctionOptions::external(&isa))?;
+        let isa = self.codegen.module.target_config();
+        let options = FunctionOptions::external(&isa);
 
-        let id = func.to_anon_func("(jitstate --)".parse()?)?;
+        let id = self.codegen
+            .translate_ast(ast)?
+            .to_anon_func("(jitstate --)".parse()?, options)?;
         
         // Codegenerating
         self.codegen.module.finalize_definitions()?;
@@ -77,10 +80,12 @@ impl<'a> Jit<'a> {
         let ast = self.lex_and_parse(expr, config)?;
 
         // Translating
-        let isa = self.codegen.target_config();
-        let mut func = self.codegen.translate(ast, FunctionOptions::external(&isa))?;
+        let isa = self.codegen.module.target_config();
+        let options = FunctionOptions::external(&isa);
 
-        let id = func.to_anon_func("(--)".parse()?)?;
+        let id = self.codegen
+            .translate_ast(ast)?
+            .to_anon_func("(--)".parse()?, options)?;
         
         // Codegenerating
         self.codegen.module.finalize_definitions()?;

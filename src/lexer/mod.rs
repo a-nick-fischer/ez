@@ -20,5 +20,5 @@ pub fn lex(src: String) -> Result<Vec<Token>, Error> {
     let (tokens, errs) = lexer().parse_recovery_verbose(src);
 
     tokens.map(preprocess_tokens)
-        .ok_or_else(|| Error::LexerError { inner: errs })
+        .ok_or_else(|| Error::Lexer { inner: errs })
 }

@@ -1,10 +1,10 @@
 pub mod type_env;
-pub mod types;
+pub mod typ;
 pub mod typelist;
 
 use std::{rc::Rc, cell::RefCell};
 
-use self::{types::{Type, VarContent}, typelist::TypeList};
+use self::{typ::{Type, VarContent}, typelist::TypeList};
 
 pub fn typ(name: &str, inner: Vec<Type>) -> Type {
     Type::Kind(name.to_string(), TypeList::from(inner))

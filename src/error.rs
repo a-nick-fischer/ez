@@ -1,18 +1,22 @@
+pub fn error<M: ToString>(message: M) -> Error {
+    Error::General { message: message.to_string() }
+}
+
 use std::{ops::Range};
 
 use ariadne::{Report, ReportKind, Color, Label, Fmt, ReportBuilder, Source};
 use chumsky::{prelude::Simple, error::SimpleReason};
 use yansi::Paint;
 
-use crate::{lexer::token::Token, parser::types::{typelist::TypeList, types::Type}};
+use crate::{lexer::token::Token, parser::types::{typelist::TypeList, typ::Type}};
 
 #[derive(Debug)]
 pub enum Error {
-    LexerError { 
+    Lexer { 
         inner: Vec<Simple<char>> 
     },
 
-    GeneralError {
+    General {
         message: String,
     },
 
@@ -58,13 +62,13 @@ impl Error {
             .expect("Beeing able to print errors");
 
         match self {
-            Error::LexerError { inner } => 
+            Error::Lexer { inner } => 
                 inner
                     .iter()
                     .for_each(|lex_err| 
                         print(lexer_error_report(lex_err))),
 
-            Error::GeneralError { message } => print(message_error_report(message.clone())),
+            Error::General { message } => print(message_error_report(message.clone())),
 
             Error::VariableNotFound { token: Token::Ident { value, range } } => print(simple_error_report(
                 range.clone(), 
@@ -206,7 +210,7 @@ fn lexer_error_report(err: &Simple<char>) -> ReportBuilder<Range<usize>> {
                     e.expected()
                         .map(|expected| match expected {
                             Some(expected) => {
-                                let exp = escape(expected).to_string();
+                                let exp = escape(expected);
                                 format!("{}", Paint::green(exp))
                             },
                             None => Paint::green("end of input").to_string(),

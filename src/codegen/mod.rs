@@ -4,7 +4,7 @@ use ariadne::{Color, Fmt};
 use cranelift::prelude::AbiParam;
 use cranelift_module::ModuleError;
 
-use crate::{error::Error, parser::types::{types::Type, typelist::TypeList, NUMBER_TYPE_NAME}};
+use crate::{error::Error, parser::types::{typ::Type, typelist::TypeList, NUMBER_TYPE_NAME}};
 
 pub mod compiler;
 pub mod jit;
@@ -50,6 +50,6 @@ impl Into<Vec<AbiParam>> for TypeList {
 
 impl From<ModuleError> for Error {
     fn from(value: ModuleError) -> Self {
-        Error::GeneralError { message: value.to_string() }
+        Error::General { message: value.to_string() }
     }
 }

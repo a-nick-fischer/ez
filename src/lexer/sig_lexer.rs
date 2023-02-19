@@ -68,6 +68,6 @@ pub fn lex_signature(src: &str) -> Result<LexedSignature, Error> {
     match result {
         Some(sig) => Ok(sig),
 
-        None => Err(Error::LexerError { inner: errs })
+        None => Err(Error::Lexer { inner: errs })
     }
 }

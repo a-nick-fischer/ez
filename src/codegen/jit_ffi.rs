@@ -1,6 +1,6 @@
 use std::{mem, fmt::Display};
 
-use crate::{parser::types::{type_env::TypeEnv, types::Type, *}, error::Error};
+use crate::{parser::types::{type_env::TypeEnv, typ::Type, *}, error::Error};
 
 // The struct is only allocated inside our Jit which should in theory align
 // this thing

@@ -75,8 +75,11 @@ impl Compiler {
         let ast = parse(tokens, &mut self.type_env)?;
 
         let isa = self.translator.module.target_config();
-        self.translator.translate(ast, FunctionOptions::external(&isa))?
-            .to_func("main", "(--)".parse()?); // TODO Must we accept args and return a code?
+        let options = FunctionOptions::external(&isa);
+
+        self.translator
+            .translate_ast(ast)?
+            .to_func("main", "(--)".parse()?, options); // TODO Must we accept args and return a code?
 
         let result = self.translator.module.finish();
 

@@ -1,6 +1,6 @@
 use crate::{error::Error, lexer::token::Token};
 
-use super::{type_env::TypeEnv, typelist::TypeList, types::types::Type, signature_parser::TypedSignature};
+use super::{type_env::TypeEnv, typelist::TypeList, types::typ::Type, signature_parser::TypedSignature};
 
 #[derive(Clone, Debug)]
 pub enum Node {

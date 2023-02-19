@@ -11,6 +11,7 @@ mod repl;
 mod codegen;
 mod config;
 mod debug_printer;
+mod stdlib;
 
 fn main() {
     let config = Config::parse();

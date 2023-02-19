@@ -1,6 +1,6 @@
 use std::fmt::{Display, write};
 
-use super::{types::Type, type_env::TypeEnv};
+use super::{typ::Type, type_env::TypeEnv};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeList(Vec<Type>);

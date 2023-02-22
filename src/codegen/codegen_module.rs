@@ -58,13 +58,13 @@ impl<M: Module> CodeGenModule<M> {
 
     pub fn declare_external_func(&mut self, name: &str, sig_src: &str) -> Result<FuncId, Error> {
         let mut sig = self.parse_cranelift_signature(sig_src)?;
-        sig.call_conv = self.target_config().default_call_conv;
+        sig.call_conv = self.module.target_config().default_call_conv;
     
         let func_id = self.module
             .declare_function(name, Linkage::Import, &sig)
             .expect("problem declaring external function");
     
-        return Ok(func_id)
+        Ok(func_id)
     }
 
     pub fn declare_internal_func(&mut self, name: &str, typed_sig: TypedSignature) -> Result<FuncId, Error> {
@@ -74,11 +74,7 @@ impl<M: Module> CodeGenModule<M> {
             .declare_function(name, Linkage::Local, &sig)
             .expect("problem declaring internal function");
 
-        return Ok(func_id)
-    }
-
-    pub fn target_config(&self) -> TargetFrontendConfig {
-        self.module.target_config()
+        Ok(func_id)
     }
 
     pub fn parse_cranelift_signature(&self, sig_src: &str) -> Result<Signature, Error> {

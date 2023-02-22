@@ -27,9 +27,9 @@ fn pointer_type() -> cranelift::prelude::Type {
     cranelift::prelude::types::I64
 }
 
-impl Into<cranelift::prelude::Type> for Type {
-    fn into(self) -> cranelift::prelude::Type {
-        match self {
+impl From<Type> for cranelift::prelude::Type {
+    fn from(val: Type) -> Self {
+        match val {
             Type::Kind(name, _) if name == NUMBER_TYPE_NAME => cranelift::prelude::types::F64,
 
             Type::Kind(_, _) => pointer_type(),
@@ -39,10 +39,10 @@ impl Into<cranelift::prelude::Type> for Type {
     }
 }
 
-impl Into<Vec<AbiParam>> for TypeList {
-    fn into(self) -> Vec<AbiParam> {
-        self.vec()
-            .into_iter()
+impl From<TypeList> for Vec<AbiParam> {
+    fn from(val: TypeList) -> Self {
+        val.vec()
+            .iter()
             .map(|typ| AbiParam::new(typ.clone().into()))
             .collect()
     }

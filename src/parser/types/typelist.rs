@@ -2,12 +2,12 @@ use std::fmt::Display;
 
 use super::{typ::Type, type_env::TypeEnv};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Default)]
 pub struct TypeList(Vec<Type>);
 
 impl TypeList {
     pub fn new() -> Self {
-        TypeList(vec![])
+        Self::default()
     }
 
     pub fn vec(&self) -> &Vec<Type> {

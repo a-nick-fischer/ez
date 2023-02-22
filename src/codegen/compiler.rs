@@ -5,7 +5,7 @@ use cranelift::{prelude::{*, settings::Flags}};
 use cranelift_module::Module;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}};
+use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}, debug_printer::*};
 
 use super::{codegen_module::CodeGenModule, external_linker::link, success, fail, function_translator::FunctionOptions};
 pub struct Compiler {
@@ -55,7 +55,7 @@ impl Compiler {
             Err(err) => fail(error(err), "".to_string())
         };
 
-        let compilation_result = self.do_compile(src.clone(), &output_file);
+        let compilation_result = self.do_compile(src.clone(), &output_file, debug_config);
 
         let result = compilation_result
             .and_then(|_| link(&output_file, &config.linkage))
@@ -69,17 +69,22 @@ impl Compiler {
         }
     }
 
-    fn do_compile(mut self, src: String, outfile: &PathBuf) -> Result<(), Error> {
+    fn do_compile(mut self, src: String, outfile: &PathBuf, debug_config: &DebugConfig) -> Result<(), Error> {
         let tokens = lex(src)?;
+        debug_tokens(&tokens, debug_config);
 
         let ast = parse(tokens, &mut self.type_env)?;
+        debug_ast(&ast, debug_config);
 
         let isa = self.translator.module.target_config();
         let options = FunctionOptions::external(&isa);
 
-        self.translator
-            .translate_ast(ast)?
-            .finish_func("main", "(--)".parse()?, options)?; // TODO Must we accept args and return a code?
+        let build_func = self.translator.translate_ast(ast)?;
+
+        debug_clif(&build_func.context.func, debug_config);
+        debug_asm(&build_func.context, debug_config);
+
+        build_func.finish_func("main", "(--)".parse()?, options)?; // TODO Must we accept args and return a code?
 
         let result = self.translator.module.finish();
 

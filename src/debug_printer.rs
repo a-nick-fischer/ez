@@ -30,13 +30,13 @@ pub fn debug_ast(nodes: &Vec<Node>, config: &DebugConfig) {
         do_debug(
             format!("{nodes:?}"),
             "AST:", 
-            ASM_FILE_NAME, 
+            AST_FILE_NAME, 
             config
         );
     }
 }
 
-pub fn debug_clif(func: ir::Function, config: &DebugConfig){
+pub fn debug_clif(func: &ir::Function, config: &DebugConfig){
     if config.emit_clif {
         do_debug(
             func.to_string(),
@@ -47,7 +47,7 @@ pub fn debug_clif(func: ir::Function, config: &DebugConfig){
     }
 }
 
-pub fn debug_asm(ctx: Context, config: &DebugConfig){
+pub fn debug_asm(ctx: &Context, config: &DebugConfig){
     if config.emit_asm {
         let msg = ctx.compiled_code()
             .expect("Code to be generated when printing ASM")

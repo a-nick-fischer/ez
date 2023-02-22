@@ -21,10 +21,9 @@ impl Type {
             (Kind(a, types_a), Kind(b, types_b)) if a == b && types_a.len() == types_b.len() =>
                 types_a
                     .vec()
-                    .into_iter()
+                    .iter()
                     .zip(types_b.vec())
-                    .map(|(a, b)| a.unify(b))
-                    .collect(),
+                    .try_for_each(|(a, b)| a.unify(b)),
             
             (Variable(vname, content), other) | (other, Variable(vname, content)) => {
                 {
@@ -100,7 +99,9 @@ impl Type {
             Kind(_, types) => types.occurs(var),
             
             Variable(name, content) => 
-                var == name || content.borrow().as_ref().map_or(false, |inner| inner.occurs(var))
+                var == name || content.borrow()
+                    .as_ref()
+                    .map_or(false, |inner| inner.occurs(var))
         }
     }
 
@@ -130,7 +131,7 @@ impl Type {
             var_type_raw("_b", res.clone())
         ]);
 
-        let unified = typ.unify(&self);
+        let unified = typ.unify(self);
         if unified.is_err() {
             return None;
         }
@@ -139,7 +140,7 @@ impl Type {
         let b = res.borrow().clone();
 
         if let (Some(Type::Kind(_, arguments)), Some(Type::Kind(_, returns))) = (a, b) {
-            Some((arguments.clone(), returns.clone()))
+            Some((arguments, returns))
         }
         else { None }
     }
@@ -153,7 +154,7 @@ impl Display for Type {
             Kind(name, types) => {
                 let type_str = types
                     .vec()
-                    .into_iter()
+                    .iter()
                     .map(|t| format!("[{t}]"))
                     .collect::<Vec<String>>()
                     .join("");

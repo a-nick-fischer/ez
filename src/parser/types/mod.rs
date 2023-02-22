@@ -2,7 +2,7 @@ pub mod type_env;
 pub mod typ;
 pub mod typelist;
 
-use std::{rc::Rc, cell::RefCell};
+use std::sync::{Mutex, Arc};
 
 use self::{typ::{Type, VarContent}, typelist::TypeList};
 
@@ -35,7 +35,7 @@ pub fn func_type(args: Vec<Type>, result: Vec<Type>) -> Type {
 }
 
 pub fn var_type(name: &str, value: Option<Type>) -> Type {
-    Type::Variable(name.to_string(), Rc::new(RefCell::new(value)))
+    Type::Variable(name.to_string(), Arc::new(Mutex::new(value)))
 }
 
 pub fn var_type_raw(name: &str, value: VarContent) -> Type {

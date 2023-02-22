@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc, collections::HashMap};
+use std::{collections::HashMap, sync::{Mutex, Arc}};
 
 use super::{typelist::TypeList, typ::Type};
 
@@ -24,6 +24,6 @@ impl TypeEnv {
         let name = format!("{name}{}", self.var_counter);
         self.var_counter += 1;
 
-        Type::Variable(name, Rc::new(RefCell::new(val)))
+        Type::Variable(name, Arc::new(Mutex::new(val)))
     }
 }

@@ -1,11 +1,21 @@
+use reedline::{History, Hinter};
+use yansi::Style;
 
-pub struct DefaultHinter {
+
+pub struct AutocompletionHinter {
     style: Style,
     current_hint: String,
     min_chars: usize,
+    symbols: Vec<String>
 }
 
-impl Hinter for DefaultHinter {
+impl AutocompletionHinter {
+    fn new() -> Self {
+        
+    }
+}
+
+impl Hinter for AutocompletionHinter {
     fn handle(
         &mut self,
         line: &str,

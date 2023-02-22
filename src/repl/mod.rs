@@ -1,4 +1,4 @@
-//mod hinter;
+mod hinter;
 
 use reedline::{DefaultPrompt, Reedline, Signal};
 

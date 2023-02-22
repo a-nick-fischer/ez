@@ -1,4 +1,4 @@
-use std::{collections::HashMap, cell::RefCell, rc::Rc, str::FromStr};
+use std::{collections::HashMap, str::FromStr, sync::{Arc, Mutex}};
 
 use crate::{lexer::sig_lexer::{LexedSignature, SignatureElement, lex_signature}, error::Error};
 
@@ -31,7 +31,7 @@ fn build_signature(elems: Vec<SignatureElement>, vars: &mut HashMap<String, VarC
                 var_type_raw(&name.to_string(), content.clone())
             }
             else {
-                let content = Rc::new(RefCell::new(None));
+                let content = Arc::new(Mutex::new(None));
                 vars.insert(name.clone(), content.clone());
                 Type::Variable(name, content)
             }

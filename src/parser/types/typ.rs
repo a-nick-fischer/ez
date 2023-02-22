@@ -1,15 +1,32 @@
-use std::{rc::Rc, cell::RefCell, fmt::{Display, Formatter}};
+use std::{fmt::{Display, Formatter}, sync::{Mutex, Arc}};
 
 use ariadne::{Color, Fmt};
 
 use super::{typelist::TypeList, type_env::TypeEnv, typ, var_type_raw};
 
-pub type VarContent = Rc<RefCell<Option<Type>>>;
+pub type VarContent = Arc<Mutex<Option<Type>>>;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug)]
 pub enum Type {
     Kind(String, TypeList),
     Variable(String, VarContent)
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Kind(a_name, a_vars), Self::Kind(b_name, b_vars)) => 
+                a_name == b_name && a_vars == b_vars,
+
+            // Theoretically it's valid to assume that if two variables
+            // with the same name are unified, it's a bug if their contents
+            // are not equal; therefore we may only compare the variable names
+            (Self::Variable(a_name, _), Self::Variable(b_name, _)) => 
+                a_name == b_name,
+
+            _ => false,
+        }
+    }
 }
 
 impl Type {
@@ -27,7 +44,7 @@ impl Type {
             
             (Variable(vname, content), other) | (other, Variable(vname, content)) => {
                 {
-                    if let Some(inner) = content.borrow().as_ref() {
+                    if let Some(inner) = content.lock().unwrap().as_ref() {
                         return inner.unify(other)
                     }
                 }
@@ -43,7 +60,7 @@ impl Type {
                     ))
                 }
                 else {
-                    content.replace(Some(other.clone()));
+                    *content.lock().unwrap() = Some(other.clone());
                     Ok(())
                 }
             }
@@ -64,7 +81,7 @@ impl Type {
                 Kind(a.clone(), types.refresh_vars(env)),
 
             Variable(name, content) => 
-                env.new_var(name.clone(), content.borrow().clone()),
+                env.new_var(name.clone(), content.lock().unwrap().clone()),
         }
     }
 
@@ -75,7 +92,7 @@ impl Type {
             Kind(_, types) => types.clear_vars(),
 
             Variable(_, content) => { 
-                content.replace(None); 
+                *content.lock().unwrap() = None;
             },
         }
     }
@@ -88,7 +105,7 @@ impl Type {
                 types.has_bound_vars(),
 
             Variable(_, content) => 
-                content.borrow().is_some(),
+                content.lock().unwrap().is_some(),
         }
     }
 
@@ -99,7 +116,8 @@ impl Type {
             Kind(_, types) => types.occurs(var),
             
             Variable(name, content) => 
-                var == name || content.borrow()
+                var == name || content.lock()
+                    .unwrap()
                     .as_ref()
                     .map_or(false, |inner| inner.occurs(var))
         }
@@ -113,7 +131,7 @@ impl Type {
                 Kind(name.clone(), types.concretize()),
             
             Variable(_, content) => {
-                match content.borrow().as_ref() {
+                match content.lock().unwrap().as_ref() {
                     Some(inner) => inner.concretize(),
 
                     None => self.clone()
@@ -123,8 +141,8 @@ impl Type {
     }
 
     pub fn extract_function(&self) -> Option<(TypeList, TypeList)> {
-        let args = Rc::new(RefCell::new(None));
-        let res = Rc::new(RefCell::new(None));
+        let args = Arc::new(Mutex::new(None));
+        let res = Arc::new(Mutex::new(None));
 
         let typ = typ("fun", vec![
             var_type_raw("_a", args.clone()),
@@ -136,8 +154,8 @@ impl Type {
             return None;
         }
             
-        let a = args.borrow().clone();
-        let b = res.borrow().clone();
+        let a = args.lock().unwrap().clone();
+        let b = res.lock().unwrap().clone();
 
         if let (Some(Type::Kind(_, arguments)), Some(Type::Kind(_, returns))) = (a, b) {
             Some((arguments, returns))

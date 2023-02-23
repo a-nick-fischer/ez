@@ -56,8 +56,6 @@ impl<'a, M: Module> TranslatedFunction<'a, M> {
         let mut sig = self.codegen.build_cranelift_signature(sig)?;
         sig.call_conv = options.call_conv;
 
-        println!("{}", self.context.func);
-
         let id = self
             .codegen
             .module
@@ -103,13 +101,19 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         );
 
         let entry = builder.create_block();
+        builder.append_block_params_for_function_params(entry);
         builder.switch_to_block(entry);
+        builder.seal_block(entry);
 
         for node in nodes {
             self.translate_node(node, &mut builder)?;
         }
 
+        // TODO Somehow get signature here
+        builder.ins().return_(&[]);
+
         builder.seal_all_blocks();
+        builder.finalize();
 
         Ok(TranslatedFunction { codegen: self.codegen, context })
     }

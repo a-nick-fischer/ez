@@ -1,1 +1,5 @@
-mod native;
+mod functions;
+
+struct Library {
+    
+}

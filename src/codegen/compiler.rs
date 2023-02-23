@@ -79,9 +79,9 @@ impl Compiler {
         let isa = self.translator.module.target_config();
         let options = FunctionOptions::external(&isa);
 
-        let build_func = self.translator.translate_ast(ast)?;
-
-        let (_, ctx) = build_func.finish_func("main", "(--)".parse()?, options)?; // TODO Must we accept args and return a code?
+        let (_, ctx) = self.translator
+            .translate_ast("(--)".parse()?, ast)? // TODO Must we accept args and return a code?
+            .finish_func("main", options)?;
 
         debug_clif(&ctx.func, debug_config);
         debug_asm(&ctx, debug_config);

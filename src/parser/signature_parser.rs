@@ -4,7 +4,7 @@ use crate::{lexer::sig_lexer::{LexedSignature, SignatureElement, lex_signature},
 
 use super::{types::{typ::{VarContent, Type}, typelist::TypeList, *}};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TypedSignature(pub TypeList, pub TypeList);
 
 impl TypedSignature {

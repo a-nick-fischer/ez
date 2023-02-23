@@ -48,8 +48,6 @@ impl<'a> Jit<'a> {
     }
 
     pub fn run_saving(&mut self, expr: String, debug_config: &DebugConfig) -> Result<(), Error> {
-        self.type_env.bindings.insert("puts".to_string(), "(str --)".parse::<TypedSignature>().unwrap().into());
-
         // Parsing
         let ast = self.lex_and_parse(expr, debug_config)?;
 
@@ -57,9 +55,10 @@ impl<'a> Jit<'a> {
         let isa = self.codegen.module.target_config();
         let options = FunctionOptions::external(&isa);
 
-        let build_func = self.codegen.translate_ast(ast)?;
+        let (id, ctx) = self.codegen
+            .translate_ast("(jitstate --)".parse()?, ast)?
+            .finish_anon_func(options)?;
 
-        let (id, ctx) = build_func.finish_anon_func("(jitstate --)".parse()?, options)?;
         debug_clif(&ctx.func, debug_config);
         
         // Codegenerating
@@ -86,9 +85,10 @@ impl<'a> Jit<'a> {
         let isa = self.codegen.module.target_config();
         let options = FunctionOptions::external(&isa);
 
-        let build_func = self.codegen.translate_ast(ast)?;
-
-        let (id, ctx) = build_func.finish_anon_func("(--)".parse()?, options)?;
+        let (id, ctx) = self.codegen
+            .translate_ast("(--)".parse()?, ast)?
+            .finish_anon_func(options)?;
+        
         debug_clif(&ctx.func, debug_config);
         
         // Codegenerating

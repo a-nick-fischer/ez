@@ -22,12 +22,11 @@ impl<M: Module> CodeGenModule<M> {
         }
     }
 
-    pub fn translate_ast(&mut self, nodes: Vec<Node>) -> Result<TranslatedFunction<M>, Error> {
-        self.declare_external_func("puts", "(str --)").unwrap();
-
-        FunctionTranslator::new(self).with_body(nodes)
+    pub fn translate_ast(&mut self, sig: TypedSignature, nodes: Vec<Node>) -> Result<TranslatedFunction<M>, Error> {
+        FunctionTranslator::new(self)
+            .with_signature(sig)
+            .with_body(nodes)
     }
-
 
     pub fn create_data(&mut self, content: Vec<u8>) -> Result<DataId, Error> {
         self.data_ctx.define(content.into_boxed_slice());

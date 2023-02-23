@@ -23,7 +23,7 @@ pub enum SignatureElement {
 
 fn ident_lexer() -> impl Parser<char, String, Error = Simple<char>> + Clone {
     let punctuation = filter(|c: &char| {
-        c.is_ascii_punctuation() && !['[', ']', '{', '}', ':', '(', ')', '"', '\'', '$'].contains(c)
+        c.is_ascii_punctuation() && !['[', ']', '{', '}', ':', '(', ')', '"', '\'', '$', '-'].contains(c)
     });
 
     filter(|c: &char| c.is_alphabetic())
@@ -47,8 +47,8 @@ pub fn sig_lexer() -> impl Parser<char, LexedSignature, Error = Simple<char>> + 
             .delimited_by(just('['), just(']'));
         
         let kind = ident_lexer()
-            .then(polytypes)
-            .map(|(name, typs)| SignatureElement::Kind(name, typs));
+            .then(polytypes.or_not())
+            .map(|(name, typs)| SignatureElement::Kind(name, typs.unwrap_or_default()));
 
         var.or(kind.clone())
     });

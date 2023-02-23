@@ -1,5 +1,4 @@
 use cranelift::prelude::*;
-use cranelift::prelude::isa::TargetFrontendConfig;
 use cranelift_module::{Module, DataContext, Linkage, DataId, FuncId, FuncOrDataId};
 
 use crate::error::{Error, error};
@@ -24,6 +23,8 @@ impl<M: Module> CodeGenModule<M> {
     }
 
     pub fn translate_ast(&mut self, nodes: Vec<Node>) -> Result<TranslatedFunction<M>, Error> {
+        self.declare_external_func("puts", "(str --)").unwrap();
+
         FunctionTranslator::new(self).with_body(nodes)
     }
 

@@ -160,7 +160,7 @@ fn add_stack_comparison(builder: ReportBuilder<Range<usize>>, expected: &TypeLis
     builder
         .with_note(
             format!(
-                "Expected:\n\t{}\nGot:\n\t{}",
+                "\n\tExpected:\n\t{}\n\n\tGot:\n\t{}",
                 expected.fg(Color::Cyan),
                 got.fg(Color::Red)
             )

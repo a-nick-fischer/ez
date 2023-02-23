@@ -8,19 +8,22 @@ pub struct Config {
     #[clap(flatten)]
     pub debug_config: DebugConfig,
 
-    /// (Development) No code is actually executed. Useful pared with the emit options 
-    #[arg(long)]
-    pub dry_run: bool,
-
-    /// File to compile and rn
-    pub file: Option<PathBuf>,
-
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
 
+#[derive(Parser, Debug)]
+pub struct FileRunningConfig {
+    /// File to compile and run
+    pub file: PathBuf
+}
+
 #[derive(Debug, Args)]
 pub struct DebugConfig {
+    /// (Development) No code is actually executed. Useful pared with the emit options 
+    #[arg(long)]
+    pub dry_run: bool,
+
     /// (Development) If lexer-tokens should be outputed
     #[arg(long)]
     pub emit_tokens: bool,
@@ -38,6 +41,10 @@ pub struct DebugConfig {
     #[arg(long)]
     pub emit_asm: bool,
 
+    /// (Development) Sets all emit options to true
+    #[arg(long)]
+    pub emit_all: bool,
+
     /// (Development) If the emited tokens, ast-nodes, clif etc. should be outputed
     /// to separate files instead of printed. For compiling or running files only.
     #[arg(long)]
@@ -50,6 +57,12 @@ pub enum Commands {
     Compile {
         #[clap(flatten)]
         comp_config: CompilationConfig
+    },
+
+    /// Runs the given file
+    Run {
+        #[clap(flatten)]
+        run_config: FileRunningConfig
     }
 }
 
@@ -71,7 +84,7 @@ pub struct CompilationConfig {
     /// auto-detected. Currently there's no way to enable/disable supported features when
     /// cross-compiling.
     #[arg(short, long)]
-    pub target: String,
+    pub target: Option<String>,
 }
 
 #[derive(Debug, Args)]

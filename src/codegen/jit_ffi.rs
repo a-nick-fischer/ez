@@ -1,6 +1,6 @@
-use std::{mem, fmt::Display};
+use std::fmt::Display;
 
-use crate::{parser::types::{type_env::TypeEnv, typ::Type, *}, error::Error};
+use crate::parser::types::{type_env::{TypeEnv, TypeBindings}, typ::Type, *, typelist::TypeList};
 
 // The struct is only allocated inside our Jit which should in theory align
 // this thing
@@ -13,6 +13,18 @@ pub struct RawJitState<'a> {
 impl RawJitState<'_> {
     pub fn new() -> Self {
         RawJitState { stack: None, vars: None }
+    }
+
+    pub unsafe fn to_jit_state(&self, tenv: &TypeEnv) -> JitState {
+        let stack = self.stack
+            .map_or_else(Vec::new, 
+                |slice| values_from_raw(slice, &tenv.stack));
+
+        let vars = self.vars
+            .map_or_else(Vec::new, 
+                |slice| values_from_raw(slice, &layout_bindings(&tenv.bindings)));
+
+        JitState { stack, vars }
     }
 }
 
@@ -30,19 +42,31 @@ pub struct JitState {
     vars: Vec<JitValue>
 }
 
-pub fn print_stack(){
-   
+fn type_bindings_sorted_keys(bindings: &TypeBindings) -> Vec<String> {
+    let mut keys: Vec<String> = bindings.keys().cloned().collect();
+    keys.sort();
+    keys
 }
 
-pub fn to_jit_state(pointer: *const usize, type_env: &TypeEnv) -> Result<JitState, Error> {
-    unsafe {
-        let raw_state: &RawJitState = mem::transmute(pointer); // TODO Can we transmute a slice like that?
-    }
+fn layout_bindings(bindings: &TypeBindings) -> TypeList {
+    let mut list = TypeList::new();
 
-    todo!()
+     type_bindings_sorted_keys(bindings)
+        .iter()
+        .map(|key| bindings.get(key).unwrap().clone())
+        .for_each(|typ| list.push(typ));
+
+    list
 }
 
-unsafe fn convert(pointer: *const usize, typ: Type) -> JitValue {
+unsafe fn values_from_raw(slice: &[*const usize], types: &TypeList) -> Vec<JitValue> {
+    slice.iter()
+        .zip(types.vec())
+        .map(|(ptr, typ)| convert(ptr, typ))
+        .collect()
+}
+
+unsafe fn convert(pointer: &*const usize, typ: &Type) -> JitValue {
     match typ {
         Type::Kind(name, _) if name == NUMBER_TYPE_NAME => 
             JitValue::Number(pointer as *const _ as usize as f64),
@@ -52,7 +76,7 @@ unsafe fn convert(pointer: *const usize, typ: Type) -> JitValue {
         Type::Kind(name, _) if name == LIST_TYPE_NAME => todo!(),
 
         Type::Kind(name, _) => 
-            JitValue::Other(name, pointer as *const _ as usize),
+            JitValue::Other(name.clone(), pointer as *const _ as usize),
 
         Type::Variable(_, _) => panic!("Variables not allowed"),
     }
@@ -60,12 +84,32 @@ unsafe fn convert(pointer: *const usize, typ: Type) -> JitValue {
 
 impl Display for JitState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        write!(f, "{}", jit_values_to_str(&self.stack))
     }
 }
 
 impl Display for JitValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        match self {
+            JitValue::Number(num) => 
+                write!(f, "{num}"),
+
+            JitValue::Quote(str) => 
+                write!(f, "\"{str}\""),
+
+            JitValue::List(vals) => 
+                write!(f, "[{}]", jit_values_to_str(vals)),
+
+            JitValue::Other(name, addr) => 
+                write!(f, "{name}<{addr}>"),
+        }
     }
+}
+
+fn jit_values_to_str(vals: &[JitValue]) -> String {
+    vals
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<String>>()
+        .join(" ")
 }

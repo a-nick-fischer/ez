@@ -1,20 +1,35 @@
 mod hinter;
 
+use std::sync::{Mutex, Arc};
+
 use reedline::{DefaultPrompt, Reedline, Signal};
 
 use crate::{codegen::jit::Jit, config::Config};
 
+use self::hinter::{AutocompletionHinter, Symbols};
+
 pub struct Repl<'a> {
     line_editor: Reedline,
     jit: Jit<'a>,
-    config: Config
+    current_symbols: Arc<Mutex<Symbols>>,
+    config: Config,
 }
 
 impl<'a> Repl<'a> {
     pub fn new(config: Config) -> Self {
+        let jit = Jit::new();
+
+        let symbols = Symbols::new(jit.defined_symbols());
+
+        let current_symbols = Arc::new(Mutex::new(symbols));
+        let hinter = Box::new(AutocompletionHinter::new(current_symbols.clone()));
+
+        let line_editor = Reedline::create().with_hinter(hinter);
+
         Repl {
-            line_editor: Reedline::create(),
-            jit: Jit::new(),
+            line_editor,
+            jit,
+            current_symbols,
             config
         }
     }
@@ -26,7 +41,11 @@ impl<'a> Repl<'a> {
             let sig = self.line_editor.read_line(&prompt);
             
             match sig {
-                Ok(Signal::Success(buffer)) => self.run(buffer),
+                Ok(Signal::Success(buffer)) if buffer.trim().is_empty() => 
+                    continue,
+
+                Ok(Signal::Success(buffer)) => 
+                    self.run(buffer),
 
                 Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
                     println!("\nAborted!");
@@ -39,11 +58,14 @@ impl<'a> Repl<'a> {
     }
 
     fn run(&mut self, buffer: String) {
-        match self.jit.run_saving(buffer.clone(), &self.config) {
+        match self.jit.run_saving(buffer.clone(), &self.config.debug_config) {
             Ok(_) => {
                 let state = self.jit.jit_state();
 
-                println!("{state}")
+                println!("{state}");
+
+                let mut symbols = self.current_symbols.lock().unwrap();
+                *symbols = Symbols::new(self.jit.defined_symbols());
             },
 
             Err(err) => 

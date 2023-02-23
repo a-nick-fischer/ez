@@ -14,10 +14,15 @@ const CLIF_FILE_NAME: &str = "ez_clif.log";
 const ASM_FILE_NAME: &str = "ez_asm.log";
 
 
-pub fn debug_tokens(tokens: &Vec<Token>, config: &DebugConfig){
-    if config.emit_tokens {
+pub fn debug_tokens(tokens: &[Token], config: &DebugConfig){
+    if config.emit_tokens || config.emit_all {
+        let msg = tokens.iter()
+            .map(|t| format!("{t:?}"))
+            .collect::<Vec<String>>()
+            .join("\n");
+
         do_debug(
-            format!("{tokens:?}"),
+            msg,
             "Tokens:", 
             TOKEN_FILE_NAME, 
             config
@@ -25,10 +30,15 @@ pub fn debug_tokens(tokens: &Vec<Token>, config: &DebugConfig){
     }
 }
 
-pub fn debug_ast(nodes: &Vec<Node>, config: &DebugConfig) {
-    if config.emit_ast {
+pub fn debug_ast(nodes: &[Node], config: &DebugConfig) {
+    if config.emit_ast || config.emit_all {
+        let msg = nodes.iter()
+            .map(|n| format!("{n:?}"))
+            .collect::<Vec<String>>()
+            .join("\n");
+
         do_debug(
-            format!("{nodes:?}"),
+            msg,
             "AST:", 
             AST_FILE_NAME, 
             config
@@ -37,7 +47,7 @@ pub fn debug_ast(nodes: &Vec<Node>, config: &DebugConfig) {
 }
 
 pub fn debug_clif(func: &ir::Function, config: &DebugConfig){
-    if config.emit_clif {
+    if config.emit_clif || config.emit_all {
         do_debug(
             func.to_string(),
             "CLIF:", 
@@ -48,7 +58,7 @@ pub fn debug_clif(func: &ir::Function, config: &DebugConfig){
 }
 
 pub fn debug_asm(ctx: &Context, config: &DebugConfig){
-    if config.emit_asm {
+    if config.emit_asm || config.emit_all {
         let msg = ctx.compiled_code()
             .expect("Code to be generated when printing ASM")
             .disasm

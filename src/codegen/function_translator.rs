@@ -35,7 +35,7 @@ pub struct TranslatedFunction<'a, M: Module> {
 }
 
 impl<'a, M: Module> TranslatedFunction<'a, M> {
-    pub fn finish_func(mut self, name: &str, sig: TypedSignature, options: FunctionOptions) -> Result<FuncId, Error> {
+    pub fn finish_func(mut self, name: &str, sig: TypedSignature, options: FunctionOptions) -> Result<(FuncId, Context), Error> {
         let mut sig = self.codegen.build_cranelift_signature(sig)?;
         sig.call_conv = options.call_conv;
 
@@ -49,12 +49,14 @@ impl<'a, M: Module> TranslatedFunction<'a, M> {
             .module
             .define_function(id, &mut self.context)?;
 
-        Ok(id)
+        Ok((id, self.context))
     }
 
-    pub fn finish_anon_func(mut self, sig: TypedSignature, options: FunctionOptions) -> Result<FuncId, Error> {
+    pub fn finish_anon_func(mut self, sig: TypedSignature, options: FunctionOptions) -> Result<(FuncId, Context), Error> {
         let mut sig = self.codegen.build_cranelift_signature(sig)?;
         sig.call_conv = options.call_conv;
+
+        println!("{}", self.context.func);
 
         let id = self
             .codegen
@@ -66,7 +68,7 @@ impl<'a, M: Module> TranslatedFunction<'a, M> {
             .module
             .define_function(id, &mut self.context)?;
 
-        Ok(id)
+        Ok((id, self.context))
     }
 }
 
@@ -100,9 +102,14 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
             &mut build_ctx
         );
 
+        let entry = builder.create_block();
+        builder.switch_to_block(entry);
+
         for node in nodes {
             self.translate_node(node, &mut builder)?;
         }
+
+        builder.seal_all_blocks();
 
         Ok(TranslatedFunction { codegen: self.codegen, context })
     }
@@ -159,11 +166,11 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                 },
 
                 (types::LIST_TYPE_NAME, Literal::List(_ast)) => {
-                    todo!() // TODO No fcking clue how to translate this one..
+                    todo!()
                 },
     
                 (types::FUNC_TYPE_NAME, Literal::Function(sig, ast)) => {
-                    let id = FunctionTranslator::new(self.codegen)
+                    let (id, _) = FunctionTranslator::new(self.codegen)
                         .with_body(ast)?
                         .finish_anon_func(sig, FunctionOptions::internal())?;
 
@@ -190,8 +197,10 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
             .module
             .declare_func_in_func(func_id, builder.func);
 
-        let slice = &self.stack[args_len..];
-        let call = builder.ins().call(local_callee, slice);
+        let range = (self.stack.len() - args_len) .. self.stack.len();
+
+        let slice: Vec<Value> = self.stack.drain(range).collect();
+        let call = builder.ins().call(local_callee, &slice[..]);
 
         let results = builder.inst_results(call);
         self.stack.extend_from_slice(results);

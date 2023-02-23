@@ -13,15 +13,16 @@ mod config;
 mod debug_printer;
 mod stdlib;
 
+#[macro_use]
+extern crate lazy_static;
+
 fn main() {
     let config = Config::parse();
 
-    if config.file.is_some() {
-        Jit::new().run_file(&config);
-        return
-    }
-
     match config.command {
+        Some(Commands::Run { run_config }) =>
+            Jit::new().run_file(&run_config, &config.debug_config),
+        
         Some(Commands::Compile { comp_config }) =>
             Compiler::new().compile_file(&comp_config, &config.debug_config),
 

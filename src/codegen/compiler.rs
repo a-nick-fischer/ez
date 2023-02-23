@@ -81,10 +81,10 @@ impl Compiler {
 
         let build_func = self.translator.translate_ast(ast)?;
 
-        debug_clif(&build_func.context.func, debug_config);
-        debug_asm(&build_func.context, debug_config);
+        let (_, ctx) = build_func.finish_func("main", "(--)".parse()?, options)?; // TODO Must we accept args and return a code?
 
-        build_func.finish_func("main", "(--)".parse()?, options)?; // TODO Must we accept args and return a code?
+        debug_clif(&ctx.func, debug_config);
+        debug_asm(&ctx, debug_config);
 
         let result = self.translator.module.finish();
 

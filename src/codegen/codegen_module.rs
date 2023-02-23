@@ -2,7 +2,6 @@ use cranelift::prelude::*;
 use cranelift_module::{Module, DataContext, Linkage, DataId, FuncId, FuncOrDataId};
 
 use crate::error::{Error, error};
-use crate::lexer::sig_lexer::lex_signature;
 use crate::parser::signature_parser::TypedSignature;
 use crate::parser::node::Node;
 
@@ -38,8 +37,6 @@ impl<M: Module> CodeGenModule<M> {
         self.module
             .define_data(id, &self.data_ctx)?;
 
-        // self.data_ctx.clear(); // TODO Needed?
-
         Ok(id)
     }
 
@@ -56,19 +53,8 @@ impl<M: Module> CodeGenModule<M> {
         }
     }
 
-    pub fn declare_external_func(&mut self, name: &str, sig_src: &str) -> Result<FuncId, Error> {
-        let mut sig = self.parse_cranelift_signature(sig_src)?;
-        sig.call_conv = self.module.target_config().default_call_conv;
-    
-        let func_id = self.module
-            .declare_function(name, Linkage::Import, &sig)
-            .expect("problem declaring external function");
-    
-        Ok(func_id)
-    }
-
     pub fn declare_internal_func(&mut self, name: &str, typed_sig: TypedSignature) -> Result<FuncId, Error> {
-        let sig = self.build_cranelift_signature(typed_sig)?;
+        let sig = self.build_cranelift_signature(&typed_sig)?;
 
         let func_id = self.module
             .declare_function(name, Linkage::Local, &sig)
@@ -77,13 +63,7 @@ impl<M: Module> CodeGenModule<M> {
         Ok(func_id)
     }
 
-    pub fn parse_cranelift_signature(&self, sig_src: &str) -> Result<Signature, Error> {
-        let lexed_sig = lex_signature(sig_src)?;
-    
-        self.build_cranelift_signature(lexed_sig.into())
-    }
-
-    pub fn build_cranelift_signature(&self, sig: TypedSignature) -> Result<Signature, Error> {
+    pub fn build_cranelift_signature(&self, sig: &TypedSignature) -> Result<Signature, Error> {
         let mut cranelift_cig = self.module.make_signature();
     
         let params: Vec<AbiParam> = sig.arguments().clone().into();

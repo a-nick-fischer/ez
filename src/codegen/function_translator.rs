@@ -43,7 +43,7 @@ pub struct TranslatedFunction<'a, M: Module> {
 
 impl<'a, M: Module> TranslatedFunction<'a, M> {
     pub fn finish_func(mut self, name: &str, options: FunctionOptions) -> Result<(FuncId, Context), Error> {
-        let mut sig = self.codegen.build_cranelift_signature(self.signature)?;
+        let mut sig = self.codegen.build_cranelift_signature(&self.signature)?;
         sig.call_conv = options.call_conv;
 
         let id = self
@@ -60,7 +60,7 @@ impl<'a, M: Module> TranslatedFunction<'a, M> {
     }
 
     pub fn finish_anon_func(mut self, options: FunctionOptions) -> Result<(FuncId, Context), Error> {
-        let mut sig = self.codegen.build_cranelift_signature(self.signature)?;
+        let mut sig = self.codegen.build_cranelift_signature(&self.signature)?;
         sig.call_conv = options.call_conv;
 
         let id = self
@@ -78,9 +78,9 @@ impl<'a, M: Module> TranslatedFunction<'a, M> {
 }
 
 pub struct FunctionTranslator<'a, M: Module> {
-    codegen: &'a mut CodeGenModule<M>,
+    pub codegen: &'a mut CodeGenModule<M>,
 
-    signature: TypedSignature,
+    pub signature: TypedSignature,
 
     variables: HashMap<String, Variable>,
 
@@ -219,7 +219,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         else { unreachable!() }
     }
 
-    fn ins_call<S: AsRef<str>>(&mut self, name: S, args_len: usize, builder: &mut FunctionBuilder) -> Result<(), Error> {
+    pub fn ins_call<S: AsRef<str>>(&mut self, name: S, args_len: usize, builder: &mut FunctionBuilder) -> Result<(), Error> {
         let func_id = self.codegen.get_func_by_name(name.as_ref())?;
         
         let local_callee = self

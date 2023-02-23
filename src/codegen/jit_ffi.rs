@@ -1,4 +1,5 @@
-use std::fmt::Display;
+use core::slice;
+use std::{fmt::Display, mem, ffi::CString};
 
 use crate::parser::types::{type_env::{TypeEnv, TypeBindings}, typ::Type, *, typelist::TypeList};
 
@@ -71,9 +72,39 @@ unsafe fn convert(pointer: &*const usize, typ: &Type) -> JitValue {
         Type::Kind(name, _) if name == NUMBER_TYPE_NAME => 
             JitValue::Number(pointer as *const _ as usize as f64),
 
-        Type::Kind(name, _) if name == QUOTE_TYPE_NAME => todo!(),
+        Type::Kind(name, _) if name == QUOTE_TYPE_NAME => {
+            let ptr = pointer as *const _ as *const u64;
+            let size: &u64 = &*ptr;
 
-        Type::Kind(name, _) if name == LIST_TYPE_NAME => todo!(),
+            let str_ptr = ptr.offset(1) as *const u8;
+            
+            let buffer = slice::from_raw_parts(str_ptr, *size as usize);
+
+            let str = String::from_utf8_lossy(buffer).to_string();
+
+            JitValue::Quote(str)
+        },
+
+        Type::Kind(name, polytypes) if name == LIST_TYPE_NAME => {
+            let ptr = pointer as *const _ as *const u64;
+            let size: &u64 = &*ptr;
+
+            let list_ptr = ptr.offset(1);
+
+            let typ = polytypes.vec().first().unwrap();
+
+            let vals: Vec<JitValue> = (0..*size)
+                .into_iter()
+                .map(|offset| { 
+                    let ioffset: isize = offset.try_into().unwrap();
+                    let ptr = list_ptr.offset(ioffset) as *const usize;
+
+                    convert(&ptr, typ)
+                })
+                .collect();
+
+            JitValue::List(vals)
+        },
 
         Type::Kind(name, _) => 
             JitValue::Other(name.clone(), pointer as *const _ as usize),

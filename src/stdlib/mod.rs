@@ -1,5 +1,3 @@
 mod functions;
+mod library;
 
-struct Library {
-    
-}

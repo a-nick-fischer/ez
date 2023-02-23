@@ -53,16 +53,6 @@ impl<M: Module> CodeGenModule<M> {
         }
     }
 
-    pub fn declare_internal_func(&mut self, name: &str, typed_sig: TypedSignature) -> Result<FuncId, Error> {
-        let sig = self.build_cranelift_signature(&typed_sig)?;
-
-        let func_id = self.module
-            .declare_function(name, Linkage::Local, &sig)
-            .expect("problem declaring internal function");
-
-        Ok(func_id)
-    }
-
     pub fn build_cranelift_signature(&self, sig: &TypedSignature) -> Result<Signature, Error> {
         let mut cranelift_cig = self.module.make_signature();
     

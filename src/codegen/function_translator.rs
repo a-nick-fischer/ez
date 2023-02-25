@@ -33,10 +33,6 @@ impl FunctionOptions {
     }
 }
 
-// Yes I had fun naming this
-pub type FunGenerator<'a, M: Module> = 
-    Box<dyn Fn(&mut FunctionTranslator<'a, M>, &mut FunctionBuilder) -> Result<(), Error>>;
-
 pub struct TranslatedFunction<'a, M: Module> {
     codegen: &'a mut CodeGenModule<M>,
 
@@ -108,17 +104,19 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         self
     }
 
-    pub fn with_body(mut self, nodes: Vec<Node>) -> Result<TranslatedFunction<'a, M>, Error> {
-        self.generate_body(Box::new(|_, builder| {
+    pub fn with_body(self, nodes: Vec<Node>) -> Result<TranslatedFunction<'a, M>, Error> {
+        self.with_body_generator(|translator, builder| {
             for node in nodes {
-                self.translate_node(node, &mut builder)?;
+                translator.translate_node(node, builder)?;
             }
 
             Ok(())
-        }))
+        })
     }
 
-    pub fn generate_body(mut self, generator: FunGenerator<'a, M>) -> Result<TranslatedFunction<'a, M>, Error> {
+    pub fn with_body_generator<F>(mut self, gen: F) -> Result<TranslatedFunction<'a, M>, Error>
+        where F: FnOnce(&mut FunctionTranslator<'a, M>, &mut FunctionBuilder) -> Result<(), Error>
+    {
         let mut build_ctx = FunctionBuilderContext::new();
 
         let mut context = Context::new();
@@ -134,7 +132,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         builder.switch_to_block(entry);
         builder.seal_block(entry);
 
-        
+        gen(&mut self, &mut builder)?;
 
         let len = self.stack.len() - self.signature.returns().len();
         builder.ins().return_(&self.stack[len..]);

@@ -1,19 +1,15 @@
 mod functions;
 mod library;
+mod macros;
 
-#[macro_export]
-macro_rules! match_nodes {
-    ($nodes:ident ($arity:literal): $match:pat if $cond:expr => $blk:block) => {
-        match &$nodes.clone()[..] {
-            $match if $cond => {
-                $nodes.truncate($arity);
+use crate::library;
 
-                $blk
+fn test(){
+    library! {
+        native fn malloc("num -- pointer");
 
-                Ok(true)
-            },
-
-            _ => Ok(false)
+        mezzaine fn toint("num -- int")|trans, builder|{
+            Ok(())
         }
     }
 }

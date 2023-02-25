@@ -1,7 +1,7 @@
 use cranelift::prelude::FunctionBuilder;
 use cranelift_module::{Module, Linkage};
 
-use crate::{parser::{signature_parser::TypedSignature, node::Node}, codegen::{function_translator::FunctionTranslator, codegen_module::CodeGenModule, self}, error::Error, match_nodes};
+use crate::{parser::{signature_parser::TypedSignature, node::Node}, codegen::{function_translator::{FunctionTranslator, FunGenerator, FunctionOptions}, codegen_module::CodeGenModule, self}, error::Error, match_nodes};
 
 pub trait EzFun<M: Module> {
     fn init(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error>;
@@ -57,35 +57,33 @@ impl<M: Module> EzFun<M> for NativeFun<'_> {
 }
 
 
-type ApplyCallback<'b, M> = Box<dyn Fn(
-    &mut Vec<Node>,
-    &mut FunctionTranslator<'b, M>,
-    &mut FunctionBuilder
-) -> Result<bool, Error>>;
-
 struct SimpleFun<'b, M: Module>  {
     name: &'b str,
 
     sig: TypedSignature,
 
-    body: ApplyCallback<'b, M>
+    generator: FunGenerator<'b, M>
 }
 
 impl<'b, M: Module> SimpleFun<'b, M> {
-    fn new(name: &'b str, sig: &str, body: ApplyCallback<'b, M>) -> Result<Self, Error> {
+    fn new(name: &'b str, sig: &str, generator: FunGenerator<'b, M>) -> Result<Self, Error> {
         Ok(Self {
             name,
 
             sig: sig.parse()?,
 
-            body
+            generator
         })
     }
 }
 
 impl<M: Module> EzFun<M> for SimpleFun<'_, M> {
     fn init(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
-        
+        FunctionTranslator::new(codegen)
+            .generate_body(self.generator)?
+            .finish_func(self.name, FunctionOptions::internal())?;
+
+        Ok(())
     }
 
     fn try_apply<'b>(

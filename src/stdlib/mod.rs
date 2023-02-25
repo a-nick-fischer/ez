@@ -2,14 +2,23 @@ mod functions;
 mod library;
 mod macros;
 
+use cranelift_module::Module;
+
 use crate::library;
 
-fn test(){
-    library! {
-        native fn malloc("num -- pointer");
+use self::library::Library;
 
-        mezzaine fn toint("num -- int")|trans, builder|{
-            Ok(())
+fn test<M: Module>(){
+    let lib: Library<M> = library! {
+        functions {
+            native fn malloc("num -- pointer");
+            native fn puts("str -- ");
+
+            /*mezzaine fn toint("num -- int")|trans, builder|{
+                Ok(())
+            }*/
         }
-    }
+
+        transformations {}
+    };
 }

@@ -79,7 +79,7 @@ macro_rules! __gen_funcs {
             fn signature(&self) -> TypedSignature {
                 format!("({})", $sig).parse().unwrap()
             }
-        };
+        }
 
         let func = $name {};
         let name = <$name as EzFun<M>>::name(&func).to_string();

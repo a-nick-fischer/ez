@@ -2,6 +2,7 @@ use clap::Parser;
 use codegen::compiler::Compiler;
 use codegen::jit::Jit;
 use config::{Config, Commands};
+use cranelift_object::ObjectModule;
 use repl::Repl;
 
 mod lexer;
@@ -17,6 +18,9 @@ mod stdlib;
 extern crate lazy_static;
 
 fn main() {
+    crate::stdlib::test::<ObjectModule>();
+    return;
+
     let config = Config::parse();
 
     match config.command {

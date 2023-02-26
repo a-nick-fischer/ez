@@ -8,17 +8,19 @@ use crate::library;
 
 use self::library::Library;
 
-fn test<M: Module>(){
+pub fn test<M: Module>(){
     let lib: Library<M> = library! {
         functions {
             native fn malloc("num -- pointer");
             native fn puts("str -- ");
 
-            /*mezzaine fn toint("num -- int")|trans, builder|{
+            mezzaine fn toint("num -- int")|trans, builder|{
                 Ok(())
-            }*/
+            };
         }
 
         transformations {}
     };
+
+    println!("{:?}", lib.bindings);
 }

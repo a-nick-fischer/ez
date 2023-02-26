@@ -53,13 +53,16 @@ pub fn sig_lexer() -> impl Parser<char, LexedSignature, Error = Simple<char>> + 
         var.or(kind.clone())
     });
 
-    let side = elem.padded().repeated();
+    let side = elem.padded().repeated().or_not();
 
     side.clone()
-        .then_ignore(just("--"))
+        .then_ignore(just("--").padded())
         .then(side)
         .delimited_by(just("("), just(")"))
-        .map(|(args, ret)| LexedSignature(args, ret))
+        .map(|(args, ret)| LexedSignature(
+            args.unwrap_or_default(), 
+            ret.unwrap_or_default()
+        ))
 }
 
 pub fn lex_signature(src: &str) -> Result<LexedSignature, Error> {

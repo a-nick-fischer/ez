@@ -17,16 +17,23 @@ macro_rules! match_nodes {
 
 #[macro_export]
 macro_rules! library {
-    (functions { $($typ:ident fn $name:ident ($sig:literal))*; } transformations { $($transf:tt);* }) => {
+    (functions { $($func:tt)* } transformations { $($transf:tt);* }) => {
         {
+            use cranelift_module::Module;
+
+            use $crate::stdlib::functions::NativeFun;
+            use $crate::stdlib::functions::EzFun;
+            use $crate::parser::types::typ::Type;
+            use $crate::codegen::function_translator::{FunctionTranslator, FunctionOptions};
+            use $crate::error::Error;
+            use $crate::parser::signature_parser::TypedSignature;
+
             use $crate::stdlib::library::Library;
-            use $crate::__gen_func;
+            use $crate::__gen_funcs;
 
             let mut library = Library::new();
 
-            $(
-                __gen_func!(library, $typ fn $name ($sig));
-            )*
+             __gen_funcs!(library, $($func)*);
 
             library
         }
@@ -34,28 +41,19 @@ macro_rules! library {
 }
 
 #[macro_export]
-macro_rules! __gen_func {
-    ($library:ident, native fn $name:ident ($sig:literal)) => {
-        use $crate::stdlib::functions::NativeFun;
-        use $crate::stdlib::functions::EzFun;
-        use $crate::parser::types::typ::Type;
-
-        let func = NativeFun::new(stringify!($name), $sig).unwrap();
+macro_rules! __gen_funcs {
+    ($library:ident, native fn $name:ident ($sig:literal); $($tail:tt)*) => {
+        let func = NativeFun::new(stringify!($name), format!("({})", $sig).as_str()).unwrap();
         let name = <NativeFun<'_> as EzFun<M>>::name(&func).to_string();
         let sig: Type = <NativeFun<'_> as EzFun<M>>::signature(&func).into();
 
         $library.bindings.insert(name, sig);
         $library.transformations.push(Box::new(func));
+
+        __gen_funcs!($library, $($tail)*)
     };
 
-    ($library:ident, mezzaine fn $name:ident ($sig:literal) $blk:expr) => {
-        use cranelift_module::Module;
-
-        use $crate::codegen::function_translator::{FunctionTranslator, FunctionOptions};
-        use $crate::stdlib::functions::EzFun;
-        use $crate::error::Error;
-        use $crate::parser::signature_parser::TypedSignature;
-
+    ($library:ident, mezzaine fn $name:ident ($sig:literal) $blk:expr; $($tail:tt)*) => {
         #[allow(non_camel_case_types)]
         struct $name;
 
@@ -79,10 +77,21 @@ macro_rules! __gen_func {
         
             #[inline]
             fn signature(&self) -> TypedSignature {
-                $sig.parse().unwrap()
+                format!("({})", $sig).parse().unwrap()
             }
         };
 
-        $name {}
+        let func = $name {};
+        let name = <$name as EzFun<M>>::name(&func).to_string();
+        let sig: Type = <$name as EzFun<M>>::signature(&func).into();
+
+        $library.bindings.insert(name, sig);
+        $library.transformations.push(Box::new(func));
+
+        __gen_funcs!($library, $($tail)*)
     };
+
+    ($library:ident, ) => {};
+
+    () => {};
 }

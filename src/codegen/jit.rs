@@ -1,9 +1,9 @@
-use std::{collections::HashMap, fs, mem};
+use std::{fs, mem};
 
 use cranelift_jit::{JITModule, JITBuilder};
 use cranelift_module::Module;
 
-use crate::{parser::{types::type_env::TypeEnv, parse, node::Node, signature_parser::TypedSignature}, error::{Error, error}, lexer::lex, debug_printer::*, config::{DebugConfig, FileRunningConfig}, stdlib::{library::Transformations, create_stdlib}};
+use crate::{parser::{types::type_env::TypeEnv, parse, node::Node}, error::{Error, error}, lexer::lex, debug_printer::*, config::{DebugConfig, FileRunningConfig}, stdlib::{library::Transformations, create_stdlib}};
 
 use super::{codegen_module::CodeGenModule, fail, function_translator::FunctionOptions, jit_ffi::{RawJitState, JitState}};
 
@@ -11,8 +11,6 @@ pub struct Jit<'a> {
     codegen: CodeGenModule<JITModule>,
 
     type_env: TypeEnv,
-
-    transformations: Transformations<JITModule>,
 
     state: RawJitState<'a>
 }
@@ -25,11 +23,9 @@ impl<'a> Jit<'a> {
         let library = create_stdlib();
 
         Self {
-            codegen: CodeGenModule::new(module),
-
             type_env: library.type_env(),
 
-            transformations: library.transformations,
+            codegen: CodeGenModule::new(module, library.transformations),
 
             state: RawJitState::new()
         }

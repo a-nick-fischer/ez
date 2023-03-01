@@ -1,5 +1,5 @@
 use core::slice;
-use std::{fmt::Display, mem, ffi::CString};
+use std::fmt::Display;
 
 use crate::parser::types::{type_env::{TypeEnv, TypeBindings}, typ::Type, *, typelist::TypeList};
 

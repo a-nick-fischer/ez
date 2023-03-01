@@ -1,9 +1,10 @@
 use cranelift::prelude::*;
-use cranelift_module::{Module, DataContext, Linkage, DataId, FuncId, FuncOrDataId};
+use cranelift_module::{Module, DataContext, DataId, FuncId, FuncOrDataId};
 
 use crate::error::{Error, error};
 use crate::parser::signature_parser::TypedSignature;
 use crate::parser::node::Node;
+use crate::stdlib::library::Transformations;
 
 use super::function_translator::{FunctionTranslator, TranslatedFunction};
 
@@ -11,12 +12,15 @@ pub struct CodeGenModule<M: Module> {
     data_ctx: DataContext,
 
     pub module: M,
+
+    transformations: Transformations<M>
 }
 
 impl<M: Module> CodeGenModule<M> {
-    pub fn new(module: M) -> Self {
+    pub fn new(module: M, transformations: Transformations<M>) -> Self {
         CodeGenModule {
             data_ctx: DataContext::new(),
+            transformations,
             module
         }
     }

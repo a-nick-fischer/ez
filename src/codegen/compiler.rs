@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf, fs};
+use std::{path::PathBuf, fs};
 
 use cranelift::{prelude::{*, settings::Flags}};
 
@@ -11,9 +11,7 @@ use super::{codegen_module::CodeGenModule, external_linker::link, success, fail,
 pub struct Compiler {
     translator: CodeGenModule<ObjectModule>,
 
-    type_env: TypeEnv,
-
-    transformations: Transformations<ObjectModule>
+    type_env: TypeEnv
 }
 
 impl Compiler {
@@ -44,11 +42,9 @@ impl Compiler {
         let library = create_stdlib();
 
         Self {
-            translator: CodeGenModule::new(module),
-
             type_env: library.type_env(),
 
-            transformations: library.transformations
+            translator: CodeGenModule::new(module, library.transformations)
         }
     }
 

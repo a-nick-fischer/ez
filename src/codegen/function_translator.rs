@@ -82,9 +82,9 @@ pub struct FunctionTranslator<'a, M: Module> {
 
     pub signature: TypedSignature,
 
-    variables: HashMap<String, Variable>,
+    pub variables: HashMap<String, Variable>,
 
-    stack: Vec<Value>
+    pub stack: Vec<Value>
 }
 
 impl<'a, M: Module> FunctionTranslator<'a, M> {

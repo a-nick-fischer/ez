@@ -105,15 +105,17 @@ macro_rules! __gen_funcs {
     };
 
     ($library:ident, $tenv:ident, $inline:literal, ez_int fn $name:ident ($sig:literal) $src:expr; $($tail:tt)*) => {
-        let sig = format!("({})", $sig).as_str();
+        let sig = format!("({})", $sig);
         let name = stringify!($name);
         let src = stringify!($src);
 
+        println!("{}", src);
+
         let func = if $inline {
-            UserFun::new_inline(name, sig, src, &mut $tenv).unwrap();
+            UserFun::new_inline(name, sig.clone().as_str(), src, &mut $tenv).unwrap()
         }
         else {
-            UserFun::new(name, sig, src, &mut $tenv).unwrap();
+            UserFun::new(name, sig.clone().as_str(), src, &mut $tenv).unwrap()
         };
         
         
@@ -121,7 +123,7 @@ macro_rules! __gen_funcs {
         let sig: Type = <UserFun<'_> as EzFun<M>>::signature(&func).into();
 
         $tenv.bindings.insert(name.clone(), sig.clone());
-        $library.bindings.insert(name, sig);
+        $library.bindings.insert(name, sig.clone());
         $library.transformations.push(Box::new(func));
 
         __gen_funcs!($library, $tenv, $($tail)*)

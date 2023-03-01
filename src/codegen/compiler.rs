@@ -5,13 +5,15 @@ use cranelift::{prelude::{*, settings::Flags}};
 use cranelift_module::Module;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}, debug_printer::*};
+use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}, debug_printer::*, stdlib::{library::Transformations, create_stdlib}};
 
 use super::{codegen_module::CodeGenModule, external_linker::link, success, fail, function_translator::FunctionOptions};
 pub struct Compiler {
     translator: CodeGenModule<ObjectModule>,
 
-    type_env: TypeEnv
+    type_env: TypeEnv,
+
+    transformations: Transformations<ObjectModule>
 }
 
 impl Compiler {
@@ -39,10 +41,14 @@ impl Compiler {
 
         let module = ObjectModule::new(builder.unwrap());
 
+        let library = create_stdlib();
+
         Self {
             translator: CodeGenModule::new(module),
 
-            type_env: TypeEnv::new(&HashMap::new()), // TODO Change once we have a standard library
+            type_env: library.type_env(),
+
+            transformations: library.transformations
         }
     }
 

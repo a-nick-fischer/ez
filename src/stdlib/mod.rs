@@ -8,7 +8,7 @@ use crate::library;
 
 use self::library::Library;
 
-pub fn test<M: Module>(){
+pub fn create_stdlib<M: Module>() -> Library<M> {
     let lib: Library<M> = library! {
         functions {
             native fn malloc("num -- pointer");
@@ -17,10 +17,15 @@ pub fn test<M: Module>(){
             mezzaine fn toint("num -- int")|trans, builder|{
                 Ok(())
             };
+
+            #[inline]
+            ez fn test("bla -- bla") "";
         }
 
         transformations {}
     };
 
     println!("{:?}", lib.bindings);
+
+    lib
 }

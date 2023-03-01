@@ -41,13 +41,12 @@ impl<M: Module, T: EzFun<M>> CodeTransformation<M> for T {
         translator: &mut FunctionTranslator<'b, M>,
         builder: &mut FunctionBuilder
     ) -> Result<bool, Error> {
-
-        if self.should_inline() {
-            return self.try_apply_inline(nodes, translator, builder);
-        }
-
         match_nodes!(
             nodes(1): [Node::Call { name, .. }] if name == self.name() => {
+                if self.should_inline() {
+                    return self.try_apply_inline(nodes, translator, builder);
+                }
+
                 translator.ins_call(name, self.signature().arguments().len(), builder)?;
             }
         )
@@ -144,11 +143,15 @@ impl<'a, M: Module> EzFun<M> for UserFun<'a> {
 
     fn try_apply_inline<'b>(
             &self,
-            nodes: &mut Vec<Node>,
+            _nodes: &mut Vec<Node>,
             translator: &mut FunctionTranslator<'b, M>,
             builder: &mut FunctionBuilder
         ) -> Result<bool, Error> {
         
-        todo!()
+        for node in self.src.clone() {
+            translator.translate_node(node, builder)?;
+        }
+
+        Ok(true)
     }
 }

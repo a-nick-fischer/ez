@@ -147,7 +147,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         })
     }
 
-    fn translate_node(&mut self, node: Node, builder: &mut FunctionBuilder) -> Result<(), Error> {
+    pub fn translate_node(&mut self, node: Node, builder: &mut FunctionBuilder) -> Result<(), Error> {
         match node {
             Node::Assigment { name, .. } => {
                 let var = Variable::new(self.variables.len());

@@ -3,29 +3,31 @@ use std::{fs, mem};
 use cranelift_jit::{JITModule, JITBuilder};
 use cranelift_module::Module;
 
-use crate::{parser::{types::type_env::TypeEnv, parse, node::Node}, error::{Error, error}, lexer::lex, debug_printer::*, config::{DebugConfig, FileRunningConfig}, stdlib::{library::Transformations, create_stdlib}};
+use crate::{parser::{types::type_env::TypeEnv, parse, node::Node}, error::{Error, error}, lexer::lex, debug_printer::*, config::{DebugConfig, FileRunningConfig}, stdlib::create_stdlib};
 
 use super::{codegen_module::CodeGenModule, fail, function_translator::FunctionOptions, jit_ffi::{RawJitState, JitState}};
 
-pub struct Jit<'a> {
+pub struct Jit {
     codegen: CodeGenModule<JITModule>,
 
     type_env: TypeEnv,
 
-    state: RawJitState<'a>
+    state: RawJitState
 }
 
-impl<'a> Jit<'a> {
+impl Jit {
     pub fn new() -> Self {
         let builder = JITBuilder::new(cranelift_module::default_libcall_names());
         let module = JITModule::new(builder.unwrap());
 
         let library = create_stdlib();
+        let mut codegen = CodeGenModule::new(module, library.transformations.clone());
+        library.init_with(&mut codegen).expect("Could not init standard library");
 
         Self {
             type_env: library.type_env(),
 
-            codegen: CodeGenModule::new(module, library.transformations),
+            codegen,
 
             state: RawJitState::new()
         }

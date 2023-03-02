@@ -8,14 +8,14 @@ use crate::{codegen::jit::Jit, config::Config};
 
 use self::hinter::{AutocompletionHinter, Symbols};
 
-pub struct Repl<'a> {
+pub struct Repl {
     line_editor: Reedline,
-    jit: Jit<'a>,
+    jit: Jit,
     current_symbols: Arc<Mutex<Symbols>>,
     config: Config,
 }
 
-impl<'a> Repl<'a> {
+impl Repl {
     pub fn new(config: Config) -> Self {
         let jit = Jit::new();
 

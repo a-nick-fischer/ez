@@ -50,13 +50,17 @@ impl Hinter for AutocompletionHinter {
         _history: &dyn History,
         use_ansi_coloring: bool,
     ) -> String {
-        self.current_hint = if line.chars().count() >= MIN_CHARS {
+        self.current_hint = if line.len() >= MIN_CHARS {
             self.symbols
                 .lock()
                 .unwrap()
                 .search(line)
                 .get(0)
-                .cloned()
+                .map(|completion| 
+                    completion.chars()
+                        .skip(completion.len() - line.len())
+                        .collect()
+                )
                 .unwrap_or_default()
         } 
         else {

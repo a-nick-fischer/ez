@@ -40,11 +40,13 @@ impl Compiler {
         let module = ObjectModule::new(builder.unwrap());
 
         let library = create_stdlib();
+        let mut codegen = CodeGenModule::new(module, library.transformations.clone());
+        library.init_with(&mut codegen).expect("Could not init standard library");
 
         Self {
             type_env: library.type_env(),
 
-            translator: CodeGenModule::new(module, library.transformations)
+            translator: codegen
         }
     }
 

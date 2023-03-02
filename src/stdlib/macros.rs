@@ -20,6 +20,7 @@ macro_rules! library {
     (functions { $($func:tt)* } transformations { $($transf:tt);* }) => {
         {
             use cranelift_module::Module;
+            use std::rc::Rc;
 
             use $crate::stdlib::functions::*;
             use $crate::parser::types::typ::Type;
@@ -46,8 +47,10 @@ macro_rules! __gen_funcs {
         let name = <NativeFun<'_> as EzFun<M>>::name(&func).to_string();
         let sig: Type = <NativeFun<'_> as EzFun<M>>::signature(&func).into();
 
+        let funcrc = Rc::new(func);
         $library.bindings.insert(name, sig);
-        $library.transformations.push(Box::new(func));
+        $library.functions.push(funcrc.clone());
+        $library.transformations.push(funcrc);
 
         __gen_funcs!($library, $($tail)*)
     };
@@ -84,8 +87,10 @@ macro_rules! __gen_funcs {
         let name = <$name as EzFun<M>>::name(&func).to_string();
         let sig: Type = <$name as EzFun<M>>::signature(&func).into();
 
+        let funcrc = Rc::new(func);
         $library.bindings.insert(name, sig);
-        $library.transformations.push(Box::new(func));
+        $library.functions.push(funcrc.clone());
+        $library.transformations.push(funcrc);
 
         __gen_funcs!($library, $($tail)*)
     };
@@ -101,23 +106,29 @@ macro_rules! __gen_funcs {
     ($library:ident, $inline:literal, ez_int fn $name:ident ($sig:literal) $src:expr; $($tail:tt)*) => {
         let sig = format!("({})", $sig);
         let name = stringify!($name);
-        let src = stringify!($src);
+        let src = $src;
 
-        println!("{}", src);
+        let mut tenv = $library.type_env();
+        tenv.stack = sig.parse::<TypedSignature>()
+            .unwrap()
+            .arguments()
+            .clone();
 
         let func = if $inline {
-            UserFun::new_inline(name, sig.clone().as_str(), src, &mut $library.type_env()).unwrap()
+            UserFun::new_inline(name, sig.clone().as_str(), src, &mut tenv).unwrap()
         }
         else {
-            UserFun::new(name, sig.clone().as_str(), src, &mut $library.type_env()).unwrap()
+            UserFun::new(name, sig.clone().as_str(), src, &mut tenv).unwrap()
         };
         
         
         let name = <UserFun<'_> as EzFun<M>>::name(&func).to_string();
         let sig: Type = <UserFun<'_> as EzFun<M>>::signature(&func).into();
 
-        $library.bindings.insert(name, sig.clone());
-        $library.transformations.push(Box::new(func));
+        let funcrc = Rc::new(func);
+        $library.bindings.insert(name, sig);
+        $library.functions.push(funcrc.clone());
+        $library.transformations.push(funcrc);
 
         __gen_funcs!($library, $($tail)*)
     };

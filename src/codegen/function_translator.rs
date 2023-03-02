@@ -43,13 +43,13 @@ pub struct TranslatedFunction<'a, M: Module> {
 
 impl<'a, M: Module> TranslatedFunction<'a, M> {
     pub fn finish_func(mut self, name: &str, options: FunctionOptions) -> Result<(FuncId, Context), Error> {
-        let mut sig = self.codegen.build_cranelift_signature(&self.signature)?;
+        let mut sig = &mut self.context.func.signature;
         sig.call_conv = options.call_conv;
 
         let id = self
             .codegen
             .module
-            .declare_function(name, options.linkage, &sig)?;
+            .declare_function(name, options.linkage, sig)?;
 
         self
             .codegen
@@ -60,13 +60,13 @@ impl<'a, M: Module> TranslatedFunction<'a, M> {
     }
 
     pub fn finish_anon_func(mut self, options: FunctionOptions) -> Result<(FuncId, Context), Error> {
-        let mut sig = self.codegen.build_cranelift_signature(&self.signature)?;
+        let mut sig = &mut self.context.func.signature;
         sig.call_conv = options.call_conv;
 
         let id = self
             .codegen
             .module
-            .declare_anonymous_function(&sig)?;
+            .declare_anonymous_function(sig)?;
 
         self
             .codegen
@@ -120,7 +120,11 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         let mut build_ctx = FunctionBuilderContext::new();
 
         let mut context = Context::new();
-        context.set_disasm(true); // TODO This is computed even when not needed
+        let sig = self.codegen.build_cranelift_signature(&self.signature)?;
+        context.func.signature = sig;
+
+        // TODO This is computed even when not needed
+        context.set_disasm(true);
 
         let mut builder = FunctionBuilder::new(
             &mut context.func,
@@ -130,6 +134,10 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         let entry = builder.create_block();
         builder.append_block_params_for_function_params(entry);
         builder.switch_to_block(entry);
+
+        let vals = builder.block_params(entry);
+        self.stack.extend(vals);
+
         builder.seal_block(entry);
 
         gen(&mut self, &mut builder)?;
@@ -246,5 +254,13 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         self.stack.extend_from_slice(results);
 
         Ok(())
+    }
+
+    pub fn pop_node(&mut self) -> Value {
+        self.stack.pop().unwrap()
+    }
+
+    pub fn push_node(&mut self, val: Value) {
+        self.stack.push(val)
     }
 }

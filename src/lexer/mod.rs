@@ -11,7 +11,8 @@ pub mod token;
 fn preprocess_tokens(tokens: Vec<Token>) -> Vec<Token> {
     tokens
         .split(|token| matches!(token, Token::Newline))
-        .flat_map(|vec| vec.iter().rev().cloned().collect::<Vec<Token>>())
+        .rev()
+        .flat_map(|vec| vec.to_vec())
         .collect()
 }
 

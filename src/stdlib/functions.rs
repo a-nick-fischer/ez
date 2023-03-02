@@ -139,7 +139,7 @@ impl<'a, M: Module> EzFun<M> for UserFun<'a> {
         self.sig.clone()
     }
 
-    fn should_inline(&self) -> bool { true }
+    fn should_inline(&self) -> bool { self.inline }
 
     fn try_apply_inline<'b>(
             &self,

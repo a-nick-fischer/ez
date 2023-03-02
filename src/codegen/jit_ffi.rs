@@ -6,12 +6,12 @@ use crate::parser::types::{type_env::{TypeEnv, TypeBindings}, typ::Type, *, type
 // The struct is only allocated inside our Jit which should in theory align
 // this thing
 #[repr(C, packed)]
-pub struct RawJitState<'a> {
-    stack: Option<&'a [*const usize]>,
-    vars: Option<&'a [*const usize]>
+pub struct RawJitState {
+    stack: Option<*const usize>,
+    vars: Option<*const usize>
 }
 
-impl RawJitState<'_> {
+impl RawJitState {
     pub fn new() -> Self {
         RawJitState { stack: None, vars: None }
     }
@@ -60,20 +60,22 @@ fn layout_bindings(bindings: &TypeBindings) -> TypeList {
     list
 }
 
-unsafe fn values_from_raw(slice: &[*const usize], types: &TypeList) -> Vec<JitValue> {
+unsafe fn values_from_raw(slice_ptr: *const usize, types: &TypeList) -> Vec<JitValue> {
+    let slice = slice::from_raw_parts(slice_ptr, types.len());
+
     slice.iter()
         .zip(types.vec())
-        .map(|(ptr, typ)| convert(ptr, typ))
+        .map(|(ptr, typ)| convert(*ptr, typ))
         .collect()
 }
 
-unsafe fn convert(pointer: &*const usize, typ: &Type) -> JitValue {
+unsafe fn convert(pointer: usize, typ: &Type) -> JitValue {
     match typ {
         Type::Kind(name, _) if name == NUMBER_TYPE_NAME => 
-            JitValue::Number(pointer as *const _ as usize as f64),
+            JitValue::Number(pointer as f64),
 
         Type::Kind(name, _) if name == QUOTE_TYPE_NAME => {
-            let ptr = pointer as *const _ as *const u64;
+            let ptr = pointer as *const usize as *const u64;
             let size: &u64 = &*ptr;
 
             let str_ptr = ptr.offset(1) as *const u8;
@@ -86,7 +88,7 @@ unsafe fn convert(pointer: &*const usize, typ: &Type) -> JitValue {
         },
 
         Type::Kind(name, polytypes) if name == LIST_TYPE_NAME => {
-            let ptr = pointer as *const _ as *const u64;
+            let ptr = pointer as *const u64;
             let size: &u64 = &*ptr;
 
             let list_ptr = ptr.offset(1);
@@ -99,7 +101,7 @@ unsafe fn convert(pointer: &*const usize, typ: &Type) -> JitValue {
                     let ioffset: isize = offset.try_into().unwrap();
                     let ptr = list_ptr.offset(ioffset) as *const usize;
 
-                    convert(&ptr, typ)
+                    convert(ptr as usize, typ)
                 })
                 .collect();
 
@@ -107,7 +109,7 @@ unsafe fn convert(pointer: &*const usize, typ: &Type) -> JitValue {
         },
 
         Type::Kind(name, _) => 
-            JitValue::Other(name.clone(), pointer as *const _ as usize),
+            JitValue::Other(name.clone(), pointer),
 
         Type::Variable(_, _) => panic!("Variables not allowed"),
     }

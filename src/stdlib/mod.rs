@@ -60,6 +60,10 @@ pub fn create_stdlib<M: Module>() -> Library<M> {
             "#;
         }
 
-        transformations {}
+        transformations {
+            transform [Node::Call { name, .. }] if name == "save" => {
+                
+            };
+        }
     }
 }

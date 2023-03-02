@@ -17,7 +17,7 @@ macro_rules! match_nodes {
 
 #[macro_export]
 macro_rules! library {
-    (functions { $($func:tt)* } transformations { $($transf:tt);* }) => {
+    (functions { $($func:tt)* } transformations { $($transf:tt)* }) => {
         {
             use cranelift_module::Module;
             use std::rc::Rc;
@@ -26,18 +26,46 @@ macro_rules! library {
             use $crate::parser::types::typ::Type;
             use $crate::codegen::function_translator::{FunctionTranslator, FunctionOptions};
             use $crate::error::Error;
+            use $crate::parser::node::Node;
             use $crate::parser::signature_parser::TypedSignature;
 
             use $crate::stdlib::library::Library;
+            use $crate::__gen_transforms;
             use $crate::__gen_funcs;
+            use $crate::match_nodes;
 
             let mut library = Library::new();
 
-             __gen_funcs!(library, $($func)*);
+            __gen_transforms!(library, $($transf)*);
+            __gen_funcs!(library, $($func)*);
 
             library
         }
     };
+}
+
+#[macro_export]
+macro_rules! __gen_transforms {
+    ($library:ident, transform $match:pat if $cond:expr => $blk:block; $($tail:tt)*) => {
+        struct Temp;
+
+        impl<M: Module> CodeTransformation<M> for Temp {
+            fn try_apply<'b>(
+                &self,
+                nodes: &mut Vec<Node>,
+                translator: &mut FunctionTranslator<'b, M>,
+                builder: &mut FunctionBuilder
+            ) -> Result<bool, Error> {
+                match_nodes!(nodes(0): $match if $cond => $blk)
+            }
+        }
+
+        $library.transformations.push(Temp {});
+
+        __gen_transforms!($library, $($tail)*)
+    };
+
+    ($library:ident, ) => {}
 }
 
 #[macro_export]

@@ -12,7 +12,7 @@ pub trait CodeTransformation<M: Module> {
     ) -> Result<bool, Error>;
 }
 
-pub trait EzFun<M: Module>: CodeTransformation<M> {
+pub trait EzFun<M: Module> {
     fn init(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error>;
 
     fn name(&self) -> &str;
@@ -33,8 +33,11 @@ pub trait EzFun<M: Module>: CodeTransformation<M> {
     }
 }
 
-// Black magic f*ckery
-impl<M: Module, T: EzFun<M>> CodeTransformation<M> for T {
+struct FuncCodeTransformation<M> {
+    inner: Box<dyn EzFun<M>>
+}
+
+impl<M: Module> CodeTransformation<M> for FuncCodeTransformation<M> {
     fn try_apply<'b>(
         &self,
         nodes: &mut Vec<Node>,
@@ -42,14 +45,20 @@ impl<M: Module, T: EzFun<M>> CodeTransformation<M> for T {
         builder: &mut FunctionBuilder
     ) -> Result<bool, Error> {
         match_nodes!(
-            nodes(1): [Node::Call { name, .. }] if name == self.name() => {
-                if self.should_inline() {
-                    return self.try_apply_inline(nodes, translator, builder);
+            nodes(1): [Node::Call { name, .. }] if name == self.inner.name() => {
+                if self.inner.should_inline() {
+                    return self.inner.try_apply_inline(nodes, translator, builder);
                 }
 
-                translator.ins_call(name, self.signature().arguments().len(), builder)?;
+                translator.ins_call(name, self.inner.signature().arguments().len(), builder)?;
             }
         )
+    }
+}
+
+impl<M: Module> From<Box<dyn EzFun<M>>> for Box<dyn CodeTransformation<M>> {
+    fn from(func: Box<dyn EzFun<M>>) -> Self {
+        Box::new(FuncCodeTransformation { inner: func })
     }
 }
 

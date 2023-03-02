@@ -82,7 +82,7 @@ pub struct FunctionTranslator<'a, M: Module> {
 
     pub signature: TypedSignature,
 
-    pub variables: HashMap<String, Variable>,
+    pub variables: HashMap<String, Value>,
 
     pub stack: Vec<Value>
 }
@@ -158,19 +158,15 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
     pub fn translate_node(&mut self, node: Node, builder: &mut FunctionBuilder) -> Result<(), Error> {
         match node {
             Node::Assigment { name, .. } => {
-                let var = Variable::new(self.variables.len());
-                self.variables.insert(name, var);
-
-                let content = self.stack.pop().unwrap();
-                builder.def_var(var, content);
+                let node = self.pop_node();
+                self.variables.insert(name, node);
             },
     
             Node::Variable { name, .. } => {
-                let var = self.variables.get(&name)
+                let val = self.variables.get(&name)
                     .ok_or_else(|| error(format!("Variable {name} not found - yes this is a compiler bug")))?;
 
-                let val = builder.use_var(*var);
-                self.stack.push(val);
+                self.push_node(*val);
             },
     
             Node::Call { name, arguments, .. } => 

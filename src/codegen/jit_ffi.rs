@@ -43,7 +43,7 @@ pub struct JitState {
     vars: Vec<JitValue>
 }
 
-fn type_bindings_sorted_keys(bindings: &TypeBindings) -> Vec<String> {
+pub fn type_bindings_sorted_keys(bindings: &TypeBindings) -> Vec<String> {
     let mut keys: Vec<String> = bindings.keys().cloned().collect();
     keys.sort();
     keys

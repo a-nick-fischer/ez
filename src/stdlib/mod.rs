@@ -36,9 +36,9 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
         transformations {
             // We implicitly assume the last elem is the jitstate
             // Yes bad things will happen if this is not the case...
-            transform [Node::Call { name, .. }] if name == "__save" => |trans, builder|{
+            transform [Node::Call { name, .. }, ..] if name == "__save" => |trans, builder|{
                 // Get the jitstate
-                let (jitstate, stack) = trans.stack.split_last().unwrap();
+                let (jitstate, stack) = trans.stack.split_first().unwrap();
                 
                 // We do not have struct so we have to break it down by ourselves.. See RawJitState
                 let stack_ptr = builder.ins().load(types::I64, MemFlags::trusted(), *jitstate, 0);
@@ -53,6 +53,8 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
                         (offset * 8) as i32  // The offset (element index * element size) 
                     );
                 }
+
+                println!("{}", builder.func)
 
                 // TODO Save vars
             };

@@ -54,7 +54,10 @@ impl Jit {
 
     pub fn run_saving(&mut self, expr: String, debug_config: &DebugConfig) -> Result<(), Error> {
         // Parsing
-        let ast = self.lex_and_parse(expr, debug_config)?;
+        let mut ast = self.lex_and_parse(expr, debug_config)?;
+
+        // Insert save call for saving stack state
+        ast.push(Self::save_state_call());
 
         // Translating
         let isa = self.codegen.module.target_config();
@@ -73,7 +76,7 @@ impl Jit {
 
         // Running
         unsafe {
-            let state_ptr: *const _ = &self.state;
+            let state_ptr: *const _ = &mut self.state;
 
             let fun = mem::transmute::<_, fn(*const RawJitState) -> ()>(pointer);
             fun(state_ptr);
@@ -84,10 +87,7 @@ impl Jit {
 
     pub fn run(&mut self, expr: String, debug_config: &DebugConfig) -> Result<(), Error> {
         // Parsing
-        let mut ast = self.lex_and_parse(expr, debug_config)?;
-
-        // Insert save call for saving stack state
-        ast.push(Self::save_state_call());
+        let ast = self.lex_and_parse(expr, debug_config)?;
 
         // Translating
         let isa = self.codegen.module.target_config();

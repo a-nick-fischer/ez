@@ -1,29 +1,35 @@
 use core::slice;
-use std::fmt::Display;
+use std::{fmt::Display, ptr::null};
 
 use crate::parser::types::{type_env::{TypeEnv, TypeBindings}, typ::Type, *, typelist::TypeList};
 
 // The struct is only allocated inside our Jit which should in theory align
 // this thing
-#[repr(C, packed)]
+#[repr(C)]
 pub struct RawJitState {
-    stack: Option<*const usize>,
-    vars: Option<*const usize>
+    stack: *const usize,
+    vars: *const usize
 }
 
 impl RawJitState {
     pub fn new() -> Self {
-        RawJitState { stack: None, vars: None }
+        RawJitState { stack: null(), vars: null() }
     }
 
     pub unsafe fn to_jit_state(&self, tenv: &TypeEnv) -> JitState {
-        let stack = self.stack
-            .map_or_else(Vec::new, 
-                |slice| values_from_raw(slice, &tenv.stack));
+        let stack = if self.stack.is_null() {
+            Vec::new()
+        }
+        else {
+            values_from_raw(self.stack, &tenv.stack)
+        };
 
-        let vars = self.vars
-            .map_or_else(Vec::new, 
-                |slice| values_from_raw(slice, &layout_bindings(&tenv.bindings)));
+        let vars = if self.vars.is_null() {
+            Vec::new()
+        }
+        else {
+            values_from_raw(self.stack, &layout_bindings(&tenv.bindings))
+        };
 
         JitState { stack, vars }
     }

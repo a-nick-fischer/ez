@@ -34,7 +34,7 @@ macro_rules! library {
             use $crate::__register;
             use $crate::match_nodes;
 
-            let mut library = Library::default();
+            let mut library = Library::new();
 
             __gen_transforms!(library, $($transf)*);
             __gen_funcs!(library, $($func)*);
@@ -49,8 +49,8 @@ macro_rules! __gen_transforms {
     ($library:ident, transform $match:pat if $cond:expr => $blk:block; $($tail:tt)*) => {
         struct Temp;
 
-        impl CodeTransformation for Temp {
-            fn try_apply<'b, M: Module>(
+        impl<M: Module> CodeTransformation<M> for Temp {
+            fn try_apply<'b>(
                 &self,
                 nodes: &mut Vec<Node>,
                 translator: &mut FunctionTranslator<'b, M>,
@@ -80,8 +80,8 @@ macro_rules! __register {
 macro_rules! __gen_funcs {
     ($library:ident, native fn $name:ident ($sig:literal); $($tail:tt)*) => {
         let func = NativeFun::new(stringify!($name), format!("({})", $sig).as_str()).unwrap();
-        let name = <NativeFun<'_> as EzFun>::name(&func).to_string();
-        let sig: Type = <NativeFun<'_> as EzFun>::signature(&func).into();
+        let name = <NativeFun as EzFun<M>>::name(&func).to_string();
+        let sig: Type = <NativeFun as EzFun<M>>::signature(&func).into();
 
         __register!($library, func, name, sig);
         __gen_funcs!($library, $($tail)*)
@@ -91,8 +91,8 @@ macro_rules! __gen_funcs {
         #[allow(non_camel_case_types)]
         struct $name;
 
-        impl EzFun for $name {
-            fn init<M: Module>(&self, codegen: &mut $crate::codegen::codegen_module::CodeGenModule<M>) -> Result<(), Error> {
+        impl<M: Module> EzFun<M> for $name {
+            fn init(&self, codegen: &mut $crate::codegen::codegen_module::CodeGenModule<M>) -> Result<(), Error> {
                 let sig = <$name as EzFun<M>>::signature(self);
                 let name = <$name as EzFun<M>>::name(self);
 
@@ -116,8 +116,8 @@ macro_rules! __gen_funcs {
         }
 
         let func = $name {};
-        let name = <$name as EzFun>::name(&func).to_string();
-        let sig: Type = <$name as EzFun>::signature(&func).into();
+        let name = <$name as EzFun<M>>::name(&func).to_string();
+        let sig: Type = <$name as EzFun<M>>::signature(&func).into();
 
         __register!($library, func, name, sig);
         __gen_funcs!($library, $($tail)*)
@@ -150,8 +150,8 @@ macro_rules! __gen_funcs {
         };
         
         
-        let name = <UserFun<'_> as EzFun>::name(&func).to_string();
-        let sig: Type = <UserFun<'_> as EzFun>::signature(&func).into();
+        let name = <UserFun as EzFun<M>>::name(&func).to_string();
+        let sig: Type = <UserFun as EzFun<M>>::signature(&func).into();
 
         __register!($library, func, name, sig);
         __gen_funcs!($library, $($tail)*)

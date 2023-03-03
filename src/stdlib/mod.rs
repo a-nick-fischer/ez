@@ -4,12 +4,13 @@ pub mod macros;
 
 use cranelift::prelude::InstBuilder;
 use cranelift::prelude::*;
+use cranelift_module::Module;
 
 use crate::library;
 
 use self::library::Library;
 
-pub fn create_stdlib() -> Library {
+pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
     library! {
         functions {
             native fn malloc("num -- pointer");

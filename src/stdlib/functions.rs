@@ -3,8 +3,8 @@ use cranelift_module::{Module, Linkage};
 
 use crate::{parser::{signature_parser::TypedSignature, node::Node, parse, types::type_env::TypeEnv}, codegen::{function_translator::{FunctionTranslator, FunctionOptions}, codegen_module::CodeGenModule}, error::Error, match_nodes, lexer::lex};
 
-pub trait CodeTransformation {
-    fn try_apply<'b, M: Module>(
+pub trait CodeTransformation<M: Module> {
+    fn try_apply<'b>(
         &self,
         nodes: &mut Vec<Node>,
         translator: &mut FunctionTranslator<'b, M>,
@@ -12,8 +12,8 @@ pub trait CodeTransformation {
     ) -> Result<bool, Error>;
 }
 
-pub trait EzFun {
-    fn init<M: Module>(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error>;
+pub trait EzFun<M: Module> {
+    fn init(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error>;
 
     fn name(&self) -> &str;
 
@@ -23,7 +23,7 @@ pub trait EzFun {
         false
     }
 
-    fn try_apply_inline<'b, M: Module>(
+    fn try_apply_inline<'b>(
         &self,
         nodes: &mut Vec<Node>,
         translator: &mut FunctionTranslator<'b, M>,
@@ -33,12 +33,12 @@ pub trait EzFun {
     }
 }
 
-pub struct FuncCodeTransformation {
-    pub inner: Box<dyn EzFun>
+pub struct FuncCodeTransformation<M> {
+    pub inner: Box<dyn EzFun<M>>
 }
 
-impl CodeTransformation for FuncCodeTransformation {
-    fn try_apply<'b, M: Module>(
+impl<M: Module> CodeTransformation<M> for FuncCodeTransformation<M> {
+    fn try_apply<'b>(
         &self,
         nodes: &mut Vec<Node>,
         translator: &mut FunctionTranslator<'b, M>,
@@ -56,35 +56,35 @@ impl CodeTransformation for FuncCodeTransformation {
     }
 }
 
-pub struct NativeFun<'a> {
-    name: &'a str,
+pub struct NativeFun {
+    name: String,
 
     sig: TypedSignature
 }
 
-impl<'a> NativeFun<'a> {
-    pub fn new(name: &'a str, sig: &str) -> Result<Self, Error> {
+impl NativeFun {
+    pub fn new(name: &str, sig: &str) -> Result<Self, Error> {
         Ok(Self {
-            name,
+            name: name.to_string(),
 
             sig: sig.parse()?
         })
     }
 }
 
-impl<'a> EzFun for NativeFun<'a> {
+impl<M: Module> EzFun<M> for NativeFun {
     fn init(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
         let mut sig = codegen.build_cranelift_signature(&self.sig)?;
         sig.call_conv = codegen.module.target_config().default_call_conv;
     
         codegen.module
-            .declare_function(self.name, Linkage::Import, &sig)?;
+            .declare_function(&self.name, Linkage::Import, &sig)?;
 
         Ok(())
     }
 
     fn name(&self) -> &str {
-        self.name
+        &self.name
     }
 
     fn signature(&self) -> TypedSignature {
@@ -92,8 +92,8 @@ impl<'a> EzFun for NativeFun<'a> {
     }
 }
 
-pub struct UserFun<'a> {
-    name: &'a str,
+pub struct UserFun {
+    name: String,
 
     sig: TypedSignature,
 
@@ -102,21 +102,21 @@ pub struct UserFun<'a> {
     inline: bool
 }
 
-impl<'a> UserFun<'a> {
-    pub fn new(name: &'a str, sig: &str, src: &str, tenv: &mut TypeEnv) -> Result<Self, Error> {
+impl UserFun {
+    pub fn new(name: &str, sig: &str, src: &str, tenv: &mut TypeEnv) -> Result<Self, Error> {
         UserFun::new_raw(name, sig, src, tenv, false)
     }
 
-    pub fn new_inline(name: &'a str, sig: &str, src: &str, tenv: &mut TypeEnv) -> Result<Self, Error> {
+    pub fn new_inline(name: &str, sig: &str, src: &str, tenv: &mut TypeEnv) -> Result<Self, Error> {
         UserFun::new_raw(name, sig, src, tenv, true)
     }
 
-    fn new_raw(name: &'a str, sig: &str, src: &str, tenv: &mut TypeEnv, inline: bool) -> Result<Self, Error> {
+    fn new_raw(name: &str, sig: &str, src: &str, tenv: &mut TypeEnv, inline: bool) -> Result<Self, Error> {
         let tokens = lex(src.to_string())?;
         let nodes = parse(tokens, tenv)?;
 
         Ok(Self {
-            name,
+            name: name.to_string(),
             inline,
             src: nodes,
             sig: sig.parse()?
@@ -124,18 +124,18 @@ impl<'a> UserFun<'a> {
     }
 }
 
-impl<'a> EzFun for UserFun<'a> {
-    fn init<M: Module>(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
+impl<M: Module> EzFun<M> for UserFun {
+    fn init(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
         FunctionTranslator::new(codegen)
             .with_signature(self.sig.clone())
             .with_body(self.src.clone())?
-            .finish_func(self.name, FunctionOptions::internal())?;
+            .finish_func(&self.name, FunctionOptions::internal())?;
 
         Ok(())
     }
 
     fn name(&self) -> &str {
-        self.name
+        &self.name
     }
 
     fn signature(&self) -> TypedSignature {

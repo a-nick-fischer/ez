@@ -13,7 +13,7 @@ pub struct CodeGenModule<M: Module> {
 
     pub module: M,
 
-    pub transformations: Transformations
+    pub transformations: Transformations<M>
 }
 
 impl<M: Module> CodeGenModule<M> {

@@ -4,20 +4,30 @@ use crate::{parser::types::type_env::{TypeBindings, TypeEnv}, codegen::codegen_m
 
 use super::functions::{CodeTransformation, EzFun, FuncCodeTransformation};
 
-pub type Transformations = Vec<Box<dyn CodeTransformation>>;
-pub type Functions = Vec<Box<dyn EzFun>>;
+pub type Transformations<M> = Vec<Box<dyn CodeTransformation<M>>>;
+pub type Functions<M> = Vec<Box<dyn EzFun<M>>>;
 
-#[derive(Default)]
-pub struct Library {
+pub struct Library<M: Module> {
     pub bindings: TypeBindings,
 
-    pub functions: Functions,
+    pub functions: Functions<M>,
 
-    pub transformations: Transformations
+    pub transformations: Transformations<M>
 }
 
-impl Library {
-    pub fn init_codegen<M: Module>(self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
+impl<M: Module + 'static> Library<M> {
+    pub fn new() -> Self {
+        Self {
+            bindings: TypeBindings::new(),
+
+            functions: Functions::new(),
+
+            transformations: Transformations::new()
+        }
+    }
+
+
+    pub fn init_codegen(self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
         for func in self.functions {
             func.init(codegen)?;
 

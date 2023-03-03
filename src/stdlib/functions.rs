@@ -25,9 +25,9 @@ pub trait EzFun<M: Module> {
 
     fn try_apply_inline<'b>(
         &self,
-        nodes: &mut Vec<Node>,
-        translator: &mut FunctionTranslator<'b, M>,
-        builder: &mut FunctionBuilder
+        _nodes: &mut Vec<Node>,
+        _translator: &mut FunctionTranslator<'b, M>,
+        _builder: &mut FunctionBuilder
     ) -> Result<bool, Error> { 
         Ok(false) 
     }
@@ -151,7 +151,7 @@ impl<M: Module> EzFun<M> for UserFun {
             builder: &mut FunctionBuilder
         ) -> Result<bool, Error> {
         
-        translator.translate_nodes(self.src.clone(), builder);
+        translator.translate_nodes(self.src.clone(), builder)?;
 
         Ok(true)
     }

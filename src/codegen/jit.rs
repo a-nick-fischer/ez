@@ -3,7 +3,7 @@ use std::{fs, mem};
 use cranelift_jit::{JITModule, JITBuilder};
 use cranelift_module::Module;
 
-use crate::{parser::{types::type_env::TypeEnv, parse, node::Node}, error::{Error, error}, lexer::lex, debug_printer::*, config::{DebugConfig, FileRunningConfig}, stdlib::create_stdlib};
+use crate::{parser::{types::{type_env::TypeEnv, typelist::TypeList}, parse, node::Node}, error::{Error, error}, lexer::{lex, token::Token}, debug_printer::*, config::{DebugConfig, FileRunningConfig}, stdlib::create_stdlib};
 
 use super::{codegen_module::CodeGenModule, fail, function_translator::FunctionOptions, jit_ffi::{RawJitState, JitState}};
 
@@ -84,7 +84,10 @@ impl Jit {
 
     pub fn run(&mut self, expr: String, debug_config: &DebugConfig) -> Result<(), Error> {
         // Parsing
-        let ast = self.lex_and_parse(expr, debug_config)?;
+        let mut ast = self.lex_and_parse(expr, debug_config)?;
+
+        // Insert save call for saving stack state
+        ast.push(Self::save_state_call());
 
         // Translating
         let isa = self.codegen.module.target_config();
@@ -129,6 +132,16 @@ impl Jit {
     pub fn jit_state(&self) -> JitState {
         unsafe {
             self.state.to_jit_state(&self.type_env)
+        }
+    }
+
+    fn save_state_call() -> Node {
+        Node::Call { 
+            name: "__save".to_string(), 
+            token: Token::Newline, // TODO It does not matter, but this is hacky anyways
+            arguments: TypeList::new(),
+            returns: TypeList::new(), 
+            stack_size: 0
         }
     }
 }

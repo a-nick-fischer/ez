@@ -20,6 +20,7 @@ macro_rules! library {
     (functions { $($func:tt)* } transformations { $($transf:tt)* }) => {
         {
             use cranelift_module::Module;
+            use std::rc::Rc;
 
             use $crate::stdlib::functions::*;
             use $crate::parser::types::typ::Type;
@@ -60,7 +61,7 @@ macro_rules! __gen_transforms {
             }
         }
 
-        $library.transformations.push(Box::new(Temp {}));
+        $library.transformations.push(Rc::new(Temp {}));
 
         __gen_transforms!($library, $($tail)*)
     };

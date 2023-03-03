@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cranelift::{prelude::{FunctionBuilder, Value, Variable, EntityRef, InstBuilder, FunctionBuilderContext, isa::{CallConv, TargetFrontendConfig}}, codegen::Context};
+use cranelift::{prelude::{FunctionBuilder, Value, InstBuilder, FunctionBuilderContext, isa::{CallConv, TargetFrontendConfig}}, codegen::Context};
 use cranelift_module::{Module, Linkage, FuncId};
 
 use crate::{parser::{node::{Node, Literal}, types::{typ::Type, self}, signature_parser::TypedSignature}, error::{Error, error}};
@@ -35,8 +35,6 @@ impl FunctionOptions {
 
 pub struct TranslatedFunction<'a, M: Module> {
     codegen: &'a mut CodeGenModule<M>,
-
-    signature: TypedSignature,
 
     pub context: Context
 }
@@ -148,16 +146,24 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
 
         Ok(TranslatedFunction { 
             codegen: self.codegen, 
-            context, 
-            signature: self.signature 
+            context
         })
     }
 
     pub fn translate_nodes(&mut self, mut nodes: Vec<Node>, builder: &mut FunctionBuilder) -> Result<(), Error> {
-        let transforms = &self.codegen.transformations;
+        let transforms = self.codegen.transformations.clone();
 
-        for transform in transforms.into_iter() {
-            let res = transform.try_apply(&mut nodes, self, builder)?;
+        'outer: while !nodes.is_empty() {
+            for transform in transforms.iter() {
+                // Try to apply one of the known transforms
+                if transform.try_apply(&mut nodes, self, builder)? {
+                    continue 'outer;
+                }
+            }
+
+            // Fall back to "normal" translations (TODO should be integrated with transforms)
+            let top = nodes.remove(0);
+            self.translate_single_node(top, builder)?;
         }
 
         Ok(())

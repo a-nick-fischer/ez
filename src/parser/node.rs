@@ -46,7 +46,7 @@ pub enum Literal {
 }
 
 impl Node {
-    pub fn stack_size_before(&self) -> usize {
+    /*pub fn stack_size_before(&self) -> usize {
         match self {
             Node::Assigment { stack_size, .. } |
             Node::Variable { stack_size, .. } |
@@ -65,7 +65,7 @@ impl Node {
             
             Node::Literal { stack_size, .. } => stack_size + 1,
         }
-    }
+    }*/
 
     pub fn apply(&self, env: &mut TypeEnv) -> Result<(), Error> {
         match self {

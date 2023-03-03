@@ -36,7 +36,7 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
         transformations {
             // We implicitly assume the last elem is the jitstate
             // Yes bad things will happen if this is not the case...
-            transform [Node::Call { name, .. }] if name == "save" => |trans, builder|{
+            transform [Node::Call { name, .. }] if name == "__save" => |trans, builder|{
                 // Get the jitstate
                 let (jitstate, stack) = trans.stack.split_last().unwrap();
                 

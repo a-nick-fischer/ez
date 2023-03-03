@@ -27,11 +27,16 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
                 Ok(())
             };
 
-            // TODO Make this a transformation
-            
+            #[inline]
+            ez fn swap("num num -- num num") r#"
+                b a b: a:
+            "#;
+        }
+
+        transformations {
             // We implicitly assume the last elem is the jitstate
             // Yes bad things will happen if this is not the case...
-            mezzaine fn save("--")|trans, builder|{
+            transform [Node::Call { name, .. }] if name == "save" => |trans, builder|{
                 // Get the jitstate
                 let (jitstate, stack) = trans.stack.split_last().unwrap();
                 
@@ -50,19 +55,6 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
                 }
 
                 // TODO Save vars
-
-                Ok(())
-            };
-
-            #[inline]
-            ez fn swap("num num -- num num") r#"
-                b a b: a:
-            "#;
-        }
-
-        transformations {
-            transform [Node::Call { name, .. }] if name == "save" => {
-                
             };
         }
     }

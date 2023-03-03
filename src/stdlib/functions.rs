@@ -151,9 +151,7 @@ impl<M: Module> EzFun<M> for UserFun {
             builder: &mut FunctionBuilder
         ) -> Result<bool, Error> {
         
-        for node in self.src.clone() {
-            translator.translate_node(node, builder)?;
-        }
+        translator.translate_nodes(self.src.clone(), builder);
 
         Ok(true)
     }

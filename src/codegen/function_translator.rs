@@ -106,9 +106,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
 
     pub fn with_body(self, nodes: Vec<Node>) -> Result<TranslatedFunction<'a, M>, Error> {
         self.with_body_generator(|translator, builder| {
-            for node in nodes {
-                translator.translate_node(node, builder)?;
-            }
+            translator.translate_nodes(nodes, builder)?;
 
             Ok(())
         })
@@ -155,7 +153,17 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         })
     }
 
-    pub fn translate_node(&mut self, node: Node, builder: &mut FunctionBuilder) -> Result<(), Error> {
+    pub fn translate_nodes(&mut self, mut nodes: Vec<Node>, builder: &mut FunctionBuilder) -> Result<(), Error> {
+        let transforms = &self.codegen.transformations;
+
+        for transform in transforms.into_iter() {
+            let res = transform.try_apply(&mut nodes, self, builder)?;
+        }
+
+        Ok(())
+    }
+
+    fn translate_single_node(&mut self, node: Node, builder: &mut FunctionBuilder) -> Result<(), Error> {
         match node {
             Node::Assigment { name, .. } => {
                 let node = self.pop_node();

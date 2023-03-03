@@ -4,7 +4,7 @@ use super::{typelist::TypeList, typ::Type};
 
 pub type TypeBindings = HashMap<String, Type>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TypeEnv {
     pub var_counter: u32,
     pub stack: TypeList,

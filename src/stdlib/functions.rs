@@ -3,8 +3,8 @@ use cranelift_module::{Module, Linkage};
 
 use crate::{parser::{signature_parser::TypedSignature, node::Node, parse, types::type_env::TypeEnv}, codegen::{function_translator::{FunctionTranslator, FunctionOptions}, codegen_module::CodeGenModule}, error::Error, match_nodes, lexer::lex};
 
-pub trait CodeTransformation<M: Module> {
-    fn try_apply<'b>(
+pub trait CodeTransformation {
+    fn try_apply<'b, M: Module>(
         &self,
         nodes: &mut Vec<Node>,
         translator: &mut FunctionTranslator<'b, M>,
@@ -12,8 +12,8 @@ pub trait CodeTransformation<M: Module> {
     ) -> Result<bool, Error>;
 }
 
-pub trait EzFun<M: Module> {
-    fn init(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error>;
+pub trait EzFun {
+    fn init<M: Module>(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error>;
 
     fn name(&self) -> &str;
 
@@ -23,7 +23,7 @@ pub trait EzFun<M: Module> {
         false
     }
 
-    fn try_apply_inline<'b>(
+    fn try_apply_inline<'b, M: Module>(
         &self,
         nodes: &mut Vec<Node>,
         translator: &mut FunctionTranslator<'b, M>,
@@ -33,12 +33,12 @@ pub trait EzFun<M: Module> {
     }
 }
 
-struct FuncCodeTransformation<M> {
-    inner: Box<dyn EzFun<M>>
+pub struct FuncCodeTransformation {
+    pub inner: Box<dyn EzFun>
 }
 
-impl<M: Module> CodeTransformation<M> for FuncCodeTransformation<M> {
-    fn try_apply<'b>(
+impl CodeTransformation for FuncCodeTransformation {
+    fn try_apply<'b, M: Module>(
         &self,
         nodes: &mut Vec<Node>,
         translator: &mut FunctionTranslator<'b, M>,
@@ -53,12 +53,6 @@ impl<M: Module> CodeTransformation<M> for FuncCodeTransformation<M> {
                 translator.ins_call(name, self.inner.signature().arguments().len(), builder)?;
             }
         )
-    }
-}
-
-impl<M: Module> From<Box<dyn EzFun<M>>> for Box<dyn CodeTransformation<M>> {
-    fn from(func: Box<dyn EzFun<M>>) -> Self {
-        Box::new(FuncCodeTransformation { inner: func })
     }
 }
 
@@ -78,7 +72,7 @@ impl<'a> NativeFun<'a> {
     }
 }
 
-impl<'a, M: Module> EzFun<M> for NativeFun<'a> {
+impl<'a> EzFun for NativeFun<'a> {
     fn init(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
         let mut sig = codegen.build_cranelift_signature(&self.sig)?;
         sig.call_conv = codegen.module.target_config().default_call_conv;
@@ -130,8 +124,8 @@ impl<'a> UserFun<'a> {
     }
 }
 
-impl<'a, M: Module> EzFun<M> for UserFun<'a> {
-    fn init(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
+impl<'a> EzFun for UserFun<'a> {
+    fn init<M: Module>(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
         FunctionTranslator::new(codegen)
             .with_signature(self.sig.clone())
             .with_body(self.src.clone())?

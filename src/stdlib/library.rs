@@ -1,37 +1,31 @@
-use std::rc::Rc;
-
 use cranelift_module::Module;
 
 use crate::{parser::types::type_env::{TypeBindings, TypeEnv}, codegen::codegen_module::CodeGenModule, error::Error};
 
-use super::functions::{CodeTransformation, EzFun};
+use super::functions::{CodeTransformation, EzFun, FuncCodeTransformation};
 
-pub type Transformations<M> = Vec<Rc<dyn CodeTransformation<M>>>;
-pub type Functions<M> = Vec<Rc<dyn EzFun<M>>>;
+pub type Transformations = Vec<Box<dyn CodeTransformation>>;
+pub type Functions = Vec<Box<dyn EzFun>>;
 
-pub struct Library<M: Module> {
+#[derive(Default)]
+pub struct Library {
     pub bindings: TypeBindings,
 
-    pub functions: Functions<M>,
+    pub functions: Functions,
 
-    pub transformations: Transformations<M>
+    pub transformations: Transformations
 }
 
-impl<M: Module> Library<M> {
-    pub fn new() -> Self {
-        Self {
-            bindings: TypeBindings::new(),
-
-            functions: Vec::new(),
-
-            transformations: Vec::new()
-        }
-    }
-
-    pub fn init_with(&self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
-        for func in &self.functions {
+impl Library {
+    pub fn init_codegen<M: Module>(self, codegen: &mut CodeGenModule<M>) -> Result<(), Error> {
+        for func in self.functions {
             func.init(codegen)?;
+
+            let transform = Box::new(FuncCodeTransformation { inner: func });
+            codegen.transformations.push(transform);
         }
+
+        codegen.transformations.extend(self.transformations);
 
         Ok(())
     }

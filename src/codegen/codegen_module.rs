@@ -13,14 +13,14 @@ pub struct CodeGenModule<M: Module> {
 
     pub module: M,
 
-    transformations: Transformations<M>
+    pub transformations: Transformations
 }
 
 impl<M: Module> CodeGenModule<M> {
-    pub fn new(module: M, transformations: Transformations<M>) -> Self {
+    pub fn new(module: M) -> Self {
         CodeGenModule {
             data_ctx: DataContext::new(),
-            transformations,
+            transformations: Vec::new(),
             module
         }
     }

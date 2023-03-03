@@ -1,5 +1,5 @@
 use core::slice;
-use std::{fmt::Display, ptr::null};
+use std::fmt::Display;
 
 use crate::parser::types::{type_env::{TypeEnv, TypeBindings}, typ::Type, *, typelist::TypeList};
 
@@ -7,28 +7,28 @@ use crate::parser::types::{type_env::{TypeEnv, TypeBindings}, typ::Type, *, type
 // this thing
 #[repr(C)]
 pub struct RawJitState {
-    stack: *const usize,
-    vars: *const usize
+    pub stack: [usize; 256],
+    pub vars: [usize; 256]
 }
 
 impl RawJitState {
     pub fn new() -> Self {
-        RawJitState { stack: null(), vars: null() }
+        RawJitState { stack: [0; 256], vars: [0; 256] }
     }
 
     pub unsafe fn to_jit_state(&self, tenv: &TypeEnv) -> JitState {
-        let stack = if self.stack.is_null() {
+        let stack = if tenv.stack.is_empty() {
             Vec::new()
         }
         else {
-            values_from_raw(self.stack, &tenv.stack)
+            values_from_raw(&self.stack[..tenv.stack.len()], &tenv.stack)
         };
 
-        let vars = if self.vars.is_null() {
+        let vars = if tenv.bindings.is_empty() {
             Vec::new()
         }
         else {
-            values_from_raw(self.stack, &layout_bindings(&tenv.bindings))
+            values_from_raw(&self.vars[..tenv.bindings.len()], &layout_bindings(&tenv.bindings))
         };
 
         JitState { stack, vars }
@@ -66,9 +66,7 @@ fn layout_bindings(bindings: &TypeBindings) -> TypeList {
     list
 }
 
-unsafe fn values_from_raw(slice_ptr: *const usize, types: &TypeList) -> Vec<JitValue> {
-    let slice = slice::from_raw_parts(slice_ptr, types.len());
-
+unsafe fn values_from_raw(slice: &[usize], types: &TypeList) -> Vec<JitValue> {
     slice.iter()
         .zip(types.vec())
         .map(|(ptr, typ)| convert(*ptr, typ))
@@ -77,8 +75,10 @@ unsafe fn values_from_raw(slice_ptr: *const usize, types: &TypeList) -> Vec<JitV
 
 unsafe fn convert(pointer: usize, typ: &Type) -> JitValue {
     match typ {
-        Type::Kind(name, _) if name == NUMBER_TYPE_NAME => 
-            JitValue::Number(pointer as f64),
+        Type::Kind(name, _) if name == NUMBER_TYPE_NAME => {
+            let val = f64::from_bits(pointer.try_into().unwrap());
+            JitValue::Number(val)
+        },
 
         Type::Kind(name, _) if name == QUOTE_TYPE_NAME => {
             let ptr = pointer as *const usize as *const u64;

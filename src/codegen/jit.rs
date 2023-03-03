@@ -76,10 +76,8 @@ impl Jit {
 
         // Running
         unsafe {
-            let state_ptr: *const _ = &mut self.state;
-
-            let fun = mem::transmute::<_, fn(*const RawJitState) -> ()>(pointer);
-            fun(state_ptr);
+            let fun = mem::transmute::<_, fn(*mut RawJitState) -> ()>(pointer);
+            fun(&mut self.state);
         }
         
         Ok(())

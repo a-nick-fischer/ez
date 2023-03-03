@@ -13,7 +13,7 @@ use self::library::Library;
 pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
     library! {
         functions {
-            native fn malloc("num -- pointer");
+            native fn malloc("cint -- pointer");
             native fn puts("cstr -- ");
 
             mezzaine fn cstr("str -- cstr")|trans, builder|{
@@ -41,15 +41,15 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
                 let (jitstate, stack) = trans.stack.split_first().unwrap();
                 
                 // We do not have struct so we have to break it down by ourselves.. See RawJitState
-                let stack_ptr = builder.ins().load(types::I64, MemFlags::trusted(), *jitstate, 0);
+                //let stack_ptr = builder.ins().load(types::I64, MemFlags::new(), *jitstate, 0);
                 //let vars_ptr = builder.ins().load(types::I64, MemFlags::trusted(), *jitstate, 8);
 
                 // Copy the stack from the Stack2SSA-Pass to the stack pointer
                 for (offset, val) in stack.iter().enumerate() {
                     builder.ins().store(
-                        MemFlags::trusted(), // The memory is aligned & does not trap (hopefully)
+                        MemFlags::new(),     // The memory is aligned & does not trap (hopefully)
                         *val,                // The thing we want to store
-                        stack_ptr,           // The base pointer
+                        *jitstate,           // The base pointer
                         (offset * 8) as i32  // The offset (element index * element size) 
                     );
                 }

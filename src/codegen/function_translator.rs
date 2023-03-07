@@ -178,9 +178,20 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
     
             Node::Variable { name, .. } => {
                 let val = self.variables.get(&name)
+                    .cloned()
+                    .or_else(|| self.codegen.get_func_by_name(&name)
+                        .ok()
+                        .map(|func_id| {
+                            let callee = self.codegen
+                                .module
+                                .declare_func_in_func(func_id, builder.func);
+
+                            builder.ins().func_addr(pointer_type(), callee)
+                        })
+                    )
                     .ok_or_else(|| error(format!("Variable {name} not found - yes this is a compiler bug")))?;
 
-                self.push_node(*val);
+                self.push_node(val);
             },
     
             Node::Call { name, arguments, .. } => 

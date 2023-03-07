@@ -1,7 +1,7 @@
 use std::process::exit;
 
 use ariadne::{Color, Fmt};
-use cranelift::prelude::AbiParam;
+use cranelift::prelude::{AbiParam, isa::TargetIsa, settings::{*, Flags, self}};
 use cranelift_module::ModuleError;
 
 use crate::{error::Error, parser::types::{typ::Type, typelist::TypeList, NUMBER_TYPE_NAME}};
@@ -25,6 +25,27 @@ fn success(){
 
 fn pointer_type() -> cranelift::prelude::Type {
     cranelift::prelude::types::I64
+}
+
+fn native_isa() -> Box<dyn TargetIsa> {
+    return match cranelift_native::builder() {
+        Ok(builder) => {
+            // See https://github.com/bytecodealliance/wasmtime/blob/e4dc9c79443259e40f3e93b9c7815b0645ebd5c4/cranelift/jit/src/backend.rs#L50
+            let mut flag_builder = settings::builder();
+            flag_builder.set("use_colocated_libcalls", "false").unwrap();
+            flag_builder.set("is_pic", "true").unwrap();
+            flag_builder.set("opt_level", "speed").unwrap();
+            flag_builder.set("regalloc_checker", "true").unwrap();
+            flag_builder.set("enable_alias_analysis", "true").unwrap();
+            //flag_builder.set("use_egraphs", "true").unwrap();
+            flag_builder.set("preserve_frame_pointers", "false").unwrap();
+
+            let flags = Flags::new(flag_builder);
+            builder.finish(flags).unwrap() // TODO Errorhandling
+        },
+
+        Err(msg) => panic!("{msg}")
+    };
 }
 
 impl From<Type> for cranelift::prelude::Type {

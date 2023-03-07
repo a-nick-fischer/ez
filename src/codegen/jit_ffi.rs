@@ -81,7 +81,7 @@ unsafe fn convert(pointer: usize, typ: &Type) -> JitValue {
         },
 
         Type::Kind(name, _) if name == QUOTE_TYPE_NAME => {
-            let ptr = pointer as *const usize as *const u64;
+            let ptr = pointer as *const u64;
             let size: &u64 = &*ptr;
 
             let str_ptr = ptr.offset(1) as *const u8;
@@ -94,20 +94,24 @@ unsafe fn convert(pointer: usize, typ: &Type) -> JitValue {
         },
 
         Type::Kind(name, polytypes) if name == LIST_TYPE_NAME => {
-            let ptr = pointer as *const u64;
-            let size: &u64 = &*ptr;
+            let ptr = pointer as *const i64;
 
-            let list_ptr = ptr.offset(1);
-
+            // Get list type
             let typ = polytypes.vec().first().unwrap();
 
-            let vals: Vec<JitValue> = (0..*size)
-                .into_iter()
-                .map(|offset| { 
-                    let ioffset: isize = offset.try_into().unwrap();
-                    let ptr = list_ptr.offset(ioffset) as *const usize;
+            // *ptr with offset 0 stores the size, offset 1 (base + 8 byte) is the
+            // start of the list
+            let list_ptr = ptr.offset(1);
 
-                    convert(ptr as usize, typ)
+            println!("Base addr {:01x}", ptr as usize);
+            println!("List addr {:01x}", list_ptr as usize);
+
+            let vals: Vec<JitValue> = (0..*ptr)
+                .into_iter()
+                .map(|offset| {
+                    let ptr = list_ptr.offset(offset as isize) as *const usize;
+
+                    convert(*ptr, typ)
                 })
                 .collect();
 

@@ -5,7 +5,7 @@ use cranelift_module::Module;
 
 use crate::{parser::{types::{type_env::TypeEnv, typelist::TypeList}, parse, node::Node}, error::{Error, error}, lexer::{lex, token::Token}, debug_printer::*, config::{DebugConfig, FileRunningConfig}, stdlib::create_stdlib};
 
-use super::{codegen_module::CodeGenModule, fail, function_translator::FunctionOptions, jit_ffi::{RawJitState, JitState}};
+use super::{codegen_module::CodeGenModule, fail, function_translator::FunctionOptions, jit_ffi::{RawJitState, JitState}, native_isa};
 
 pub struct Jit {
     codegen: CodeGenModule<JITModule>,
@@ -17,8 +17,9 @@ pub struct Jit {
 
 impl Jit {
     pub fn new() -> Self {
-        let builder = JITBuilder::new(cranelift_module::default_libcall_names());
-        let module = JITModule::new(builder.unwrap());
+        let isa = native_isa();
+        let builder = JITBuilder::with_isa(isa, cranelift_module::default_libcall_names());
+        let module = JITModule::new(builder);
 
         let library = create_stdlib();
         let type_env = library.type_env();

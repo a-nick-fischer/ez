@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cranelift::{prelude::{FunctionBuilder, Value, InstBuilder, FunctionBuilderContext, isa::{CallConv, TargetFrontendConfig}}, codegen::Context};
+use cranelift::{prelude::{FunctionBuilder, Value, InstBuilder, FunctionBuilderContext, isa::{CallConv, TargetFrontendConfig}, MemFlags}, codegen::Context};
 use cranelift_module::{Module, Linkage, FuncId};
 
 use crate::{parser::{node::{Node, Literal}, types::{typ::Type, self}, signature_parser::TypedSignature}, error::{Error, error}};
@@ -222,8 +222,36 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                     Ok(builder.ins().f64const(value))
                 },
 
-                (types::LIST_TYPE_NAME, Literal::List(_ast)) => {
-                    todo!()
+                (types::LIST_TYPE_NAME, Literal::List(ast)) => {
+                    let stack_size_before = self.stack.len();
+
+                    // Inline the list as if it is were function
+                    self.translate_nodes(ast, builder)?;
+
+                    // The new values pushed by the list
+                    let vals: Vec<Value> = self.stack.drain(stack_size_before..).collect();
+
+                    // Allocate the list on the heap
+                    let len = builder.ins().iconst(cranelift::prelude::types::I64, vals.len() as i64);
+                    let size = builder.ins().imul_imm(len, 8);
+                    
+                    self.push_node(size);
+                    self.ins_call("malloc", 1, builder)?;
+
+                    // Top-of-stack should be the address returned by malloc, return it
+                    let address = self.pop_node();
+
+                    let flags = MemFlags::new();
+
+                    // Write the list length
+                    builder.ins().store(flags, len, address, 0);
+
+                    // Write the list content
+                    for (i, val) in vals.iter().enumerate(){
+                        builder.ins().store(flags, *val, address, (i as i32 + 1) * 8);
+                    }
+
+                    Ok(address)
                 },
     
                 (types::FUNC_TYPE_NAME, Literal::Function(sig, ast)) => {

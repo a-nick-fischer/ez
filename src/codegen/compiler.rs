@@ -1,13 +1,11 @@
 use std::{path::PathBuf, fs};
 
-use cranelift::{prelude::{*, settings::Flags}};
-
 use cranelift_module::Module;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
 use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}, debug_printer::*, stdlib::create_stdlib};
 
-use super::{codegen_module::CodeGenModule, external_linker::link, success, fail, function_translator::FunctionOptions};
+use super::{codegen_module::CodeGenModule, external_linker::link, success, fail, function_translator::FunctionOptions, native_isa};
 pub struct Compiler {
     translator: CodeGenModule<ObjectModule>,
 
@@ -16,24 +14,7 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new() -> Self {
-        let isa = match cranelift_native::builder() {
-            Ok(builder) => {
-                // See https://github.com/bytecodealliance/wasmtime/blob/e4dc9c79443259e40f3e93b9c7815b0645ebd5c4/cranelift/jit/src/backend.rs#L50
-                let mut flag_builder = settings::builder();
-                flag_builder.set("use_colocated_libcalls", "false").unwrap();
-                flag_builder.set("is_pic", "true").unwrap();
-                flag_builder.set("opt_level", "speed").unwrap();
-                flag_builder.set("regalloc_checker", "true").unwrap();
-                flag_builder.set("enable_alias_analysis", "true").unwrap();
-                //flag_builder.set("use_egraphs", "true").unwrap();
-                flag_builder.set("preserve_frame_pointers", "false").unwrap();
-
-                let flags = Flags::new(flag_builder);
-                builder.finish(flags).unwrap() // TODO Errorhandling
-            },
-
-            Err(msg) => panic!("{msg}")
-        };
+        let isa = native_isa();
 
         let builder = ObjectBuilder::new(isa, "output", cranelift_module::default_libcall_names());
 

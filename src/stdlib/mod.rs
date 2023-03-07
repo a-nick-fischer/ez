@@ -41,8 +41,6 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
                 let (jitstate, stack) = trans.stack.split_first().unwrap();
                 
                 // We do not have struct so we have to break it down by ourselves.. See RawJitState
-                //let stack_ptr = builder.ins().load(types::I64, MemFlags::new(), *jitstate, 0);
-                //let vars_ptr = builder.ins().load(types::I64, MemFlags::trusted(), *jitstate, 8);
 
                 // Copy the stack from the Stack2SSA-Pass to the stack pointer
                 for (offset, val) in stack.iter().enumerate() {
@@ -53,8 +51,6 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
                         (offset * 8) as i32  // The offset (element index * element size) 
                     );
                 }
-
-                println!("{}", builder.func)
 
                 // TODO Save vars
             };

@@ -41,6 +41,9 @@ impl<M: Module> CodeGenModule<M> {
         self.module
             .define_data(id, &self.data_ctx)?;
 
+        // Has to be cleared so we can overwrite it later
+        self.data_ctx.clear();
+
         Ok(id)
     }
 

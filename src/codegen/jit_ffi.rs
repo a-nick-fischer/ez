@@ -103,9 +103,6 @@ unsafe fn convert(pointer: usize, typ: &Type) -> JitValue {
             // start of the list
             let list_ptr = ptr.offset(1);
 
-            println!("Base addr {:01x}", ptr as usize);
-            println!("List addr {:01x}", list_ptr as usize);
-
             let vals: Vec<JitValue> = (0..*ptr)
                 .into_iter()
                 .map(|offset| {
@@ -118,8 +115,8 @@ unsafe fn convert(pointer: usize, typ: &Type) -> JitValue {
             JitValue::List(vals)
         },
 
-        Type::Kind(name, _) => 
-            JitValue::Other(name.clone(), pointer),
+        Type::Kind(_, _) => 
+            JitValue::Other(typ.to_string(), pointer),
 
         Type::Variable(_, _) => panic!("Variables not allowed"),
     }

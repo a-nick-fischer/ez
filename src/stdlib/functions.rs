@@ -45,7 +45,9 @@ impl<M: Module> CodeTransformation<M> for FuncCodeTransformation<M> {
         builder: &mut FunctionBuilder
     ) -> Result<bool, Error> {
         match_nodes!(
-            nodes(1): [Node::Call { name, .. }] if name == self.inner.name() => {
+            nodes: [Node::Call { name, .. }, ..] if name == self.inner.name() => {
+                nodes.remove(0);
+
                 if self.inner.should_inline() {
                     return self.inner.try_apply_inline(nodes, translator, builder);
                 }

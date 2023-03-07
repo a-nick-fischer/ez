@@ -228,8 +228,10 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                     // Inline the list as if it is were function
                     self.translate_nodes(ast, builder)?;
 
-                    // The new values pushed by the list
-                    let vals: Vec<Value> = self.stack.drain(stack_size_before..).collect();
+                    // Collect the new values pushed by the list
+                    let vals: Vec<Value> = self.stack.drain(stack_size_before..)
+                        .rev()
+                        .collect();
 
                     // Allocate the list on the heap
                     let len = builder.ins().iconst(cranelift::prelude::types::I64, vals.len() as i64);
@@ -238,7 +240,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                     self.push_node(size);
                     self.ins_call("malloc", 1, builder)?;
 
-                    // Top-of-stack should be the address returned by malloc, return it
+                    // Top-of-stack should be the address returned by malloc
                     let address = self.pop_node();
 
                     let flags = MemFlags::new();
@@ -283,7 +285,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
             .module
             .declare_func_in_func(func_id, builder.func);
 
-        let range = (self.stack.len() - args_len) .. self.stack.len();
+        let range = (self.stack.len() - args_len)..;
 
         let slice: Vec<Value> = self.stack.drain(range).collect();
         let call = builder.ins().call(local_callee, &slice[..]);

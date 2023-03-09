@@ -172,7 +172,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
     fn translate_single_node(&mut self, node: Node, builder: &mut FunctionBuilder) -> Result<(), Error> {
         match node {
             Node::Assigment { name, .. } => {
-                let node = self.pop_node();
+                let node = self.pop_value();
                 self.variables.insert(name, node);
             },
     
@@ -191,7 +191,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                     )
                     .ok_or_else(|| error(format!("Variable {name} not found - yes this is a compiler bug")))?;
 
-                self.push_node(val);
+                self.push_value(val);
             },
     
             Node::Call { name, arguments, .. } => 
@@ -248,11 +248,11 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                     let len = builder.ins().iconst(cranelift::prelude::types::I64, vals.len() as i64);
                     let size = builder.ins().imul_imm(len, 8);
                     
-                    self.push_node(size);
+                    self.push_value(size);
                     self.ins_call("malloc", 1, builder)?;
 
                     // Top-of-stack should be the address returned by malloc
-                    let address = self.pop_node();
+                    let address = self.pop_value();
 
                     let flags = MemFlags::new();
 
@@ -307,11 +307,11 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
         Ok(())
     }
 
-    pub fn pop_node(&mut self) -> Value {
+    pub fn pop_value(&mut self) -> Value {
         self.stack.pop().unwrap()
     }
 
-    pub fn push_node(&mut self, val: Value) {
+    pub fn push_value(&mut self, val: Value) {
         self.stack.push(val)
     }
 }

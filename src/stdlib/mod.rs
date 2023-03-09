@@ -17,56 +17,56 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
             native fn puts("cstr -- ");
 
             mezzaine fn add("num num -- num")|trans, builder|{
-                let a = trans.pop_node();
-                let b = trans.pop_node();
+                let a = trans.pop_value();
+                let b = trans.pop_value();
                 
                 let res = builder.ins().fadd(a, b);
 
-                trans.push_node(res);
+                trans.push_value(res);
                 
                 Ok(())
             };
 
             mezzaine fn sub("num num -- num")|trans, builder|{
-                let a = trans.pop_node();
-                let b = trans.pop_node();
+                let a = trans.pop_value();
+                let b = trans.pop_value();
                 
                 let res = builder.ins().fsub(a, b);
 
-                trans.push_node(res);
+                trans.push_value(res);
                 
                 Ok(())
             };
 
             mezzaine fn mul("num num -- num")|trans, builder|{
-                let a = trans.pop_node();
-                let b = trans.pop_node();
+                let a = trans.pop_value();
+                let b = trans.pop_value();
                 
                 let res = builder.ins().fmul(a, b);
 
-                trans.push_node(res);
+                trans.push_value(res);
                 
                 Ok(())
             };
 
             mezzaine fn div("num num -- num")|trans, builder|{
-                let a = trans.pop_node();
-                let b = trans.pop_node();
+                let a = trans.pop_value();
+                let b = trans.pop_value();
                 
                 let res = builder.ins().fdiv(a, b);
 
-                trans.push_node(res);
+                trans.push_value(res);
                 
                 Ok(())
             };
 
             mezzaine fn cstr("str -- cstr")|trans, builder|{
-                let top = trans.pop_node();
+                let top = trans.pop_value();
                 
                 // Skip the first 8 bytes 'cause they store the size
                 let res = builder.ins().iadd_imm(top, Imm64::from(8));
 
-                trans.push_node(res);
+                trans.push_value(res);
                 
                 Ok(())
             };
@@ -85,8 +85,9 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
         transformations {
             // We implicitly assume the last elem is the jitstate
             // Yes bad things will happen if this is not the case...
-            transform [Node::Call { name, .. }, ..] if name == "__save" => |trans, builder|{
-                trans.pop_node();
+            transform [Node::Call { name, .. }, ..] if name == "__save" => |nodes, trans, builder|{
+                // Pop the __save call
+                nodes.remove(0);
 
                 // Get the jitstate
                 let (jitstate, stack) = trans.stack.split_first().unwrap();

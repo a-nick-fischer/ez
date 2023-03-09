@@ -45,17 +45,17 @@ macro_rules! library {
 
 #[macro_export]
 macro_rules! __gen_transforms {
-    ($library:ident, transform $match:pat if $cond:expr => |$translator:ident, $builder:ident|$blk:block; $($tail:tt)*) => {
+    ($library:ident, transform $match:pat if $cond:expr => |$nodes:ident, $translator:ident, $builder:ident|$blk:block; $($tail:tt)*) => {
         struct Temp;
 
         impl<M: Module> CodeTransformation<M> for Temp {
             fn try_apply<'b>(
                 &self,
-                nodes: &mut Vec<Node>,
+                $nodes: &mut Vec<Node>,
                 $translator: &mut FunctionTranslator<'b, M>,
                 $builder: &mut FunctionBuilder
             ) -> Result<bool, Error> {
-                match_nodes!(nodes: $match if $cond => $blk)
+                match_nodes!($nodes: $match if $cond => $blk)
             }
         }
 

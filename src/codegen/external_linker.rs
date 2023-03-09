@@ -38,8 +38,14 @@ pub fn link(input_file: &PathBuf, config: &LinkageConfig) -> Result<(), Error> {
 fn host_command(input: &PathBuf, output: &PathBuf) -> Command {
     let mut command = Command::new("ld");
     
-    command.arg("-o")
+    command
+        .arg("-pie")
+        .arg("-O2")
+        .arg("--dynamic-linker=/lib64/ld-linux-x86-64.so.2")
+        .arg("-g") // Debug Symbols, remove later
+        .arg("-o")
         .arg(output)
+        .arg("-lc")
         .arg(input);
 
     command

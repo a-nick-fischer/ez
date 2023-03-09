@@ -41,8 +41,14 @@ impl Compiler {
 
         let result = compilation_result
             .and_then(|_| link(&output_file, &config.linkage))
-            .and_then(|_| fs::remove_file(&output_file) // Delete object file, not the actual output executable
-                .map_err(error));
+            .and_then(|_| {
+                if ! config.linkage.do_not_link {
+                    // Delete object file, not the actual output executable
+                    fs::remove_file(&output_file)
+                        .map_err(error)
+                }
+                else { Ok(()) }
+            });
 
         match result {
             Ok(_) => success(),
@@ -63,7 +69,7 @@ impl Compiler {
 
         let (_, ctx) = self.translator
             .translate_ast("(--)".parse()?, ast)? // TODO Must we accept args and return a code?
-            .finish_func("main", options)?;
+            .finish_func("_start", options)?;
 
         debug_clif(&ctx.func, debug_config);
         debug_asm(&ctx, debug_config);
@@ -85,7 +91,7 @@ fn extract_file_paths(config: &CompilationConfig) -> (PathBuf, PathBuf) {
         .clone()
         .unwrap_or_else(|| input_file.clone());
 
-    output_file.set_extension(".o");
+    output_file.set_extension("o");
 
     (input_file.clone(), output_file)
 }

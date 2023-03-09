@@ -48,7 +48,7 @@ pub struct DebugConfig {
     /// (Development) If the emited tokens, ast-nodes, clif etc. should be outputed
     /// to separate files instead of printed. For compiling or running files only.
     #[arg(long)]
-    pub emits_to_files: bool
+    pub emit_to_files: bool
 }
 
 #[derive(Subcommand, Debug)]

@@ -46,10 +46,8 @@ impl Jit {
     }
 
     fn run_file_content(&mut self, expr: String, debug_config: &DebugConfig){
-        match self.run(expr.clone(), debug_config) {
-            Ok(_) => todo!(),
-
-            Err(errs) => fail(errs, expr),
+        if let Err(errs) = self.run(expr.clone(), debug_config) {
+            fail(errs, expr)
         }
     }
 

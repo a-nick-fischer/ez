@@ -75,7 +75,7 @@ pub fn debug_asm(ctx: &Context, config: &DebugConfig){
 }
 
 fn do_debug(content: String, header: &str, file: &str, config: &DebugConfig){
-    if config.emits_to_files {
+    if config.emit_to_files {
         fs::write(file, content)
             .unwrap_or_else(|_| panic!("beeing able to write debug output to {file}"));
     }

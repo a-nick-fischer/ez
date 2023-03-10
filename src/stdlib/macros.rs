@@ -45,10 +45,11 @@ macro_rules! library {
 
 #[macro_export]
 macro_rules! __gen_transforms {
-    ($library:ident, transform $match:pat if $cond:expr => |$nodes:ident, $translator:ident, $builder:ident|$blk:block; $($tail:tt)*) => {
-        struct Temp;
+    ($library:ident, transform $name:ident: $match:pat if $cond:expr => |$nodes:ident, $translator:ident, $builder:ident|$blk:block; $($tail:tt)*) => {
+        #[allow(non_camel_case_types)]
+        struct $name;
 
-        impl<M: Module> CodeTransformation<M> for Temp {
+        impl<M: Module> CodeTransformation<M> for $name {
             fn try_apply<'b>(
                 &self,
                 $nodes: &mut Vec<Node>,
@@ -59,7 +60,7 @@ macro_rules! __gen_transforms {
             }
         }
 
-        $library.transformations.push(Rc::new(Temp {}));
+        $library.transformations.push(Rc::new($name {}));
 
         __gen_transforms!($library, $($tail)*)
     };

@@ -118,4 +118,14 @@ impl Node {
             },
         }
     }
+
+    pub fn new_marker_call(name: &str) -> Node {
+        Node::Call { 
+            name: name.to_string(), 
+            token: Token::Newline, // TODO It does not matter, but this is hacky anyways
+            arguments: TypeList::new(),
+            returns: TypeList::new(), 
+            stack_size: 0
+        }
+    }
 }

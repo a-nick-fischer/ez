@@ -15,6 +15,7 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
         functions {
             native fn malloc("cint -- pointer");
             native fn puts("cstr -- ");
+            native fn exit("cint -- ");
 
             mezzaine fn add("num num -- num")|trans, builder|{
                 let a = trans.pop_value();
@@ -85,7 +86,7 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
         transformations {
             // We implicitly assume the last elem is the jitstate
             // Yes bad things will happen if this is not the case...
-            transform [Node::Call { name, .. }, ..] if name == "__save" => |nodes, trans, builder|{
+            transform __save: [Node::Call { name, .. }, ..] if name == "__save" => |nodes, trans, builder|{
                 // Pop the __save call
                 nodes.remove(0);
 
@@ -103,6 +104,16 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
                 }
 
                 // TODO Save vars
+            };
+
+            transform __exit: [Node::Call { name, .. }, ..] if name == "__exit" => |nodes, trans, builder|{
+                // Pop the __exit call
+                nodes.remove(0);
+
+                // Call exit(0)
+                let status = builder.ins().iconst(types::I64, 0);
+                trans.push_value(status);
+                trans.ins_call("exit", 1, builder).unwrap(); // TODO Handle
             };
         }
     }

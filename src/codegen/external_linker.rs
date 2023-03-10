@@ -42,7 +42,6 @@ fn host_command(input: &PathBuf, output: &PathBuf) -> Command {
         .arg("-pie")
         .arg("-O2")
         .arg("--dynamic-linker=/lib64/ld-linux-x86-64.so.2")
-        .arg("-g") // Debug Symbols, remove later
         .arg("-o")
         .arg(output)
         .arg("-lc")

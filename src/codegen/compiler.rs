@@ -3,7 +3,7 @@ use std::{path::PathBuf, fs};
 use cranelift_module::Module;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::{types::type_env::TypeEnv, parse}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}, debug_printer::*, stdlib::create_stdlib};
+use crate::{parser::{types::type_env::TypeEnv, parse, node::Node}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}, debug_printer::*, stdlib::create_stdlib};
 
 use super::{codegen_module::CodeGenModule, external_linker::link, success, fail, function_translator::FunctionOptions, native_isa};
 pub struct Compiler {
@@ -61,8 +61,11 @@ impl Compiler {
         let tokens = lex(src)?;
         debug_tokens(&tokens, debug_config);
 
-        let ast = parse(tokens, &mut self.type_env)?;
+        let mut ast = parse(tokens, &mut self.type_env)?;
         debug_ast(&ast, debug_config);
+
+        // If we don't call exit at the end it will segfault
+        ast.push(Node::new_marker_call("__exit"));
 
         let isa = self.translator.module.target_config();
         let options = FunctionOptions::external(&isa);

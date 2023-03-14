@@ -3,9 +3,14 @@ use std::{path::PathBuf, fs};
 use cranelift_module::Module;
 use cranelift_object::{ObjectModule, ObjectBuilder};
 
-use crate::{parser::{types::type_env::TypeEnv, parse, node::Node}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}, debug_printer::*, stdlib::create_stdlib};
+use crate::{parser::{types::type_env::TypeEnv, parse, node::Node, signature_parser::TypedSignature}, lexer::lex, error::{Error, error}, config::{CompilationConfig, DebugConfig}, debug_printer::*, stdlib::create_stdlib};
 
 use super::{codegen_module::CodeGenModule, external_linker::link, success, fail, function_translator::FunctionOptions, native_isa};
+
+lazy_static! {
+    static ref MAIN_SIG: TypedSignature = "(args ci32 -- ci32)".parse().unwrap();
+}
+
 pub struct Compiler {
     translator: CodeGenModule<ObjectModule>,
 
@@ -21,7 +26,9 @@ impl Compiler {
         let module = ObjectModule::new(builder.unwrap());
 
         let library = create_stdlib();
-        let type_env = library.type_env();
+        let mut type_env = library.type_env();
+        type_env.stack = MAIN_SIG.arguments().clone();
+
         let mut translator = CodeGenModule::new(module);
         library.init_codegen(&mut translator).expect("Could not init standard library");
 
@@ -65,14 +72,15 @@ impl Compiler {
         debug_ast(&ast, debug_config);
 
         // If we don't call exit at the end it will segfault
+        ast.insert(0, Node::new_marker_call("__entry"));
         ast.push(Node::new_marker_call("__exit"));
 
         let isa = self.translator.module.target_config();
         let options = FunctionOptions::external(&isa);
 
         let (_, ctx) = self.translator
-            .translate_ast("(--)".parse()?, ast)? // TODO Must we accept args and return a code?
-            .finish_func("_start", options)?;
+            .translate_ast(MAIN_SIG.clone(), ast)?
+            .finish_func("main", options)?;
 
         debug_clif(&ctx.func, debug_config);
         debug_asm(&ctx, debug_config);

@@ -244,15 +244,15 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                         .rev()
                         .collect();
 
-                    // Allocate the list on the heap
-                    let len = builder.ins().iconst(cranelift::prelude::types::I64, vals.len() as i64);
-                    let size = builder.ins().imul_imm(len, 8);
-                    
-                    self.push_value(size);
-                    self.ins_call("malloc", 1, builder)?;
+                    // Allocate the list
+                    let data = self.codegen.create_data(vec![0;vals.len() * 8])?;
+                    let local_id = self.codegen
+                        .module
+                        .declare_data_in_func(data, builder.func);
 
-                    // Top-of-stack should be the address returned by malloc
-                    let address = self.pop_value();
+                    let address = builder.ins().symbol_value(pointer_type(), local_id);
+
+                    let len = builder.ins().iconst(cranelift::prelude::types::I64, vals.len() as i64);
 
                     let flags = MemFlags::new();
 

@@ -36,7 +36,7 @@ impl<M: Module> CodeGenModule<M> {
 
         let id = self
             .module
-            .declare_anonymous_data(false, false)?;
+            .declare_anonymous_data(true, false)?;
 
         self.module
             .define_data(id, &self.data_ctx)?;

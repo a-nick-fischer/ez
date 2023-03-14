@@ -36,15 +36,15 @@ pub fn link(input_file: &PathBuf, config: &LinkageConfig) -> Result<(), Error> {
 
 #[cfg(target_family = "unix")]
 fn host_command(input: &PathBuf, output: &PathBuf) -> Command {
-    let mut command = Command::new("ld");
+    let mut command = Command::new("cc");
     
     command
         .arg("-pie")
         .arg("-O2")
-        .arg("--dynamic-linker=/lib64/ld-linux-x86-64.so.2")
+        //.arg("--dynamic-linker=/lib64/ld-linux-x86-64.so.2")
         .arg("-o")
         .arg(output)
-        .arg("-lc")
+        //.arg("-lc")
         .arg(input);
 
     command
@@ -52,13 +52,7 @@ fn host_command(input: &PathBuf, output: &PathBuf) -> Command {
 
 #[cfg(target_family = "windows")]
 fn hosta_command(input: &PathBuf, output: &PathBuf) -> Command {
-    let mut command = Command::new("link.exe");
-    
-    command.arg("-o")
-        .arg(output)
-        .arg(input);
-
-    command
+    panic!("Not implemented yet")
 }
 
 fn custom_command(custom: &mut Vec<String>) -> Command {

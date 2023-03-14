@@ -13,9 +13,9 @@ use self::library::Library;
 pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
     library! {
         functions {
-            native fn malloc("cint -- pointer");
-            native fn puts("cstr -- ");
-            native fn exit("cint -- ");
+            native fn malloc("ci64 -- pointer");
+            native fn puts("cstr -- ci32");
+            native fn exit("ci32 -- ");
 
             mezzaine fn add("num num -- num")|trans, builder|{
                 let a = trans.pop_value();
@@ -73,13 +73,23 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
             };
 
             #[inline]
+            ez fn pop("ci32 --") r#"
+                a:
+            "#;
+
+            #[inline]
             ez fn swap("num num -- num num") r#"
                 b a b: a:
             "#;
 
             #[inline]
             ez fn print("str -- ") r#"
-                puts cstr
+                pop puts cstr
+            "#;
+
+            #[inline]
+            ez fn test("args ci32 -- ci32") r#"
+                
             "#;
         }
 
@@ -106,14 +116,32 @@ pub fn create_stdlib<M: Module + 'static>() -> Library<M> {
                 // TODO Save vars
             };
 
+            transform __entry: [Node::Call { name, .. }, ..] if name == "__entry" => |nodes, trans, _builder|{
+                // Pop the __entry call
+                nodes.remove(0);
+
+                // Ignore for now
+                trans.pop_value();
+                trans.pop_value();
+            };
+
             transform __exit: [Node::Call { name, .. }, ..] if name == "__exit" => |nodes, trans, builder|{
                 // Pop the __exit call
                 nodes.remove(0);
 
-                // Call exit(0)
-                let status = builder.ins().iconst(types::I64, 0);
+                // Return the exit value
+                let status = builder.ins().iconst(types::I32, 0);
                 trans.push_value(status);
-                trans.ins_call("exit", 1, builder).unwrap(); // TODO Handle
+            };
+
+            transform test: [Node::Call { name, .. }, ..] if name == "test" => |nodes, trans, builder|{
+                nodes.remove(0);
+
+                let size = builder.ins().iconst(types::I64, 8);
+                trans.push_value(size);
+                trans.ins_call("malloc", 1, builder).unwrap(); // TODO Handle
+                let status = builder.ins().iconst(types::I32, 0);
+                trans.push_value(status);
             };
         }
     }

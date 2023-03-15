@@ -13,6 +13,7 @@ chumsky = "0.8.0"
 ariadne = "0.1.5"
 clap = { version = "4.1.1", features = ["derive", "cargo"] }
 yansi = "0.5.1"
+nu-ansi-term = "0.47"
 rand = "0.8.5"
 reedline = "0.15.0"
 lazy_static = "1.4.0"

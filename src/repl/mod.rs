@@ -1,6 +1,7 @@
 mod hinter;
 mod symbols;
 mod completer;
+mod highlighter;
 
 use std::sync::{Mutex, Arc};
 
@@ -13,6 +14,7 @@ use self::{hinter::EzHinter, symbols::Symbols, completer::EzCompleter};
 
 lazy_static! {
     static ref BOLD: Style = Style::new(Color::Fixed(7)).bold();
+    static ref DIMMED: Style = Style::new(Color::Fixed(7)).dimmed();
 
     static ref BANNER: String = {
         let banner_style = Style::new(Color::Green).bold();
@@ -125,7 +127,7 @@ impl Repl {
                     self.run(buffer),
 
                 Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
-                    println!("\nkthxbye");
+                    println!("\n{}", DIMMED.paint("kthxbye"));
                     break;
                 },
 
@@ -139,7 +141,7 @@ impl Repl {
             Ok(_) => {
                 if !self.silent {
                     let state = self.jit.jit_state();
-                    println!("{state}");
+                    println!("|{}|", DIMMED.paint(state));
                 }
 
                 let mut symbols = self.current_symbols.lock().unwrap();

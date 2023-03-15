@@ -8,7 +8,8 @@ use crate::{parser::{types::type_env::TypeEnv, parse, node::Node, signature_pars
 use super::{codegen_module::CodeGenModule, external_linker::link, success, fail, function_translator::FunctionOptions, native_isa};
 
 lazy_static! {
-    static ref MAIN_SIG: TypedSignature = "(args ci32 -- ci32)".parse().unwrap();
+    static ref ENTRY_SIG: TypedSignature = "(args ci32 -- ci32)".parse().unwrap();
+    static ref MAIN_SIG: TypedSignature = "(--)".parse().unwrap();
 }
 
 pub struct Compiler {
@@ -68,22 +69,19 @@ impl Compiler {
         let tokens = lex(src)?;
         debug_tokens(&tokens, debug_config);
 
-        let mut ast = parse(tokens, &mut self.type_env)?;
+        let ast = parse(tokens, &mut self.type_env)?;
         debug_ast(&ast, debug_config);
 
-        // If we don't call exit at the end it will segfault
-        ast.insert(0, Node::new_marker_call("__entry"));
-        ast.push(Node::new_marker_call("__exit"));
-
-        let isa = self.translator.module.target_config();
-        let options = FunctionOptions::external(&isa);
+        let options = FunctionOptions::internal();
 
         let (_, ctx) = self.translator
             .translate_ast(MAIN_SIG.clone(), ast)?
-            .finish_func("main", options)?;
+            .finish_func("__ez_main", options)?;
 
         debug_clif(&ctx.func, debug_config);
         debug_asm(&ctx, debug_config);
+
+        self.compile_entrypoint();
 
         let result = self.translator.module.finish();
 
@@ -92,6 +90,21 @@ impl Compiler {
 
         fs::write(outfile, bytes)
             .map_err(error)
+    }
+
+    fn compile_entrypoint(&mut self){
+        let ast = vec![
+            Node::new_marker_call("__entry"),
+            Node::new_marker_call("__ez_main"),
+            Node::new_marker_call("__exit")
+        ];
+
+        let isa = self.translator.module.target_config();
+        let options = FunctionOptions::external(&isa);
+
+        self.translator
+            .translate_ast(ENTRY_SIG.clone(), ast).unwrap()
+            .finish_func("main", options).unwrap();
     }
 }
 

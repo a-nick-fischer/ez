@@ -1,4 +1,4 @@
-use std::{sync::{Arc, Mutex}};
+use std::{sync::{Arc, Mutex}, fmt::Display};
 
 use reedline::{History, Hinter};
 use weighted_trie::WeightedTrie;
@@ -25,6 +25,19 @@ impl Symbols {
 
     fn search(&self, prefix: &str) -> Vec<String> {
         self.0.search(prefix)
+    }
+}
+
+impl Display for Symbols {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let symbols: Vec<String> = self.0.search("");
+
+        let content = symbols.chunks(5)
+            .map(|chunk| chunk.join("   "))
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        write!(f, "{}", content)
     }
 }
 

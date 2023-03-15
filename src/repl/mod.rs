@@ -2,17 +2,75 @@ mod hinter;
 
 use std::sync::{Mutex, Arc};
 
-use reedline::{DefaultPrompt, Reedline, Signal};
+use reedline::{DefaultPrompt, Reedline, Signal, Prompt, DefaultPromptSegment};
+use yansi::{Color, Style};
 
 use crate::{codegen::jit::Jit, config::Config};
 
 use self::hinter::{AutocompletionHinter, Symbols};
+
+lazy_static! {
+    static ref BOLD: Style = Style::new(Color::Fixed(7)).bold();
+
+    static ref BANNER: String = {
+        let banner_style = Style::new(Color::Green).bold();
+        let line_style = Style::new(Color::Green).dimmed(); 
+        let text_style = Style::new(Color::Fixed(7)).dimmed();
+
+        let banner = r#"
+        _____ ____ 
+       /  __//_   \
+       |  \   /   /
+       |  /_ /   /_
+       \____\\____/
+                   
+       "#;
+
+       let line = "- - - - - - - - - - - - -";
+
+       let version_text = format!("[EZ JIT {}]", env!("CARGO_PKG_VERSION"));
+
+       let help_text = "Type .help for cookies";
+
+        format!(
+            "{}\n      {}\n{}\n  {}", 
+            banner_style.paint(banner),
+            text_style.paint(version_text),
+            line_style.paint(line),
+            text_style.paint(help_text)
+        )
+    };
+
+    static ref HELP_MESSAGE: String = {
+        let style = Style::new(Color::Fixed(7)).bold();
+
+        format!(r#"
+        Ha! I fooled you! You are not getting my 🍪, here's a help message instead:
+
+          - Type {} or {} to display the value of a variable without pushing it on the stack
+          - Type {} or {} to toggle the printing the stack
+          - Type {} or {} to toggle the {} options, for debugging mainly
+          - Type {} or {} to display this message (amazing, right?)
+
+        To see a list of all available press {}
+
+        "#,
+        style.paint(".i"), style.paint(".inspect"),
+        style.paint(".s"), style.paint(".silent"),
+        style.paint(".e"), style.paint(".emit"), style.paint("--emit-*"),
+        style.paint(".h"), style.paint(".help"),
+        style.paint("<TAB>")
+        )
+    };
+}
 
 pub struct Repl {
     line_editor: Reedline,
     jit: Jit,
     current_symbols: Arc<Mutex<Symbols>>,
     config: Config,
+    prompt: Box<dyn Prompt>,
+    silent: bool
 }
 
 impl Repl {
@@ -26,29 +84,36 @@ impl Repl {
 
         let line_editor = Reedline::create().with_hinter(hinter);
 
+        let prompt = Self::default_prompt();
+
         Repl {
             line_editor,
             jit,
             current_symbols,
-            config
+            config,
+            prompt,
+            silent: false
         }
     }
 
     pub fn start(&mut self){
-        let prompt = DefaultPrompt::default();
+        println!("{}", *BANNER);
     
         loop {
-            let sig = self.line_editor.read_line(&prompt);
+            let sig = self.line_editor.read_line(self.prompt.as_ref());
             
             match sig {
                 Ok(Signal::Success(buffer)) if buffer.trim().is_empty() => 
                     continue,
 
+                Ok(Signal::Success(buffer)) if buffer.starts_with('.') => 
+                    self.handle_command(buffer),
+
                 Ok(Signal::Success(buffer)) => 
                     self.run(buffer),
 
                 Ok(Signal::CtrlD) | Ok(Signal::CtrlC) => {
-                    println!("\nAborted!");
+                    println!("\nkthxbye");
                     break;
                 },
 
@@ -60,9 +125,10 @@ impl Repl {
     fn run(&mut self, buffer: String) {
         match self.jit.run_saving(buffer.clone(), &self.config.debug_config) {
             Ok(_) => {
-                let state = self.jit.jit_state();
-
-                println!("{state}");
+                if !self.silent {
+                    let state = self.jit.jit_state();
+                    println!("{state}");
+                }
 
                 let mut symbols = self.current_symbols.lock().unwrap();
                 *symbols = Symbols::new(self.jit.defined_symbols());
@@ -71,5 +137,66 @@ impl Repl {
             Err(err) => 
                 err.report(buffer),
         }
+    }
+
+    fn handle_command(&mut self, buffer: String){
+        let line: Vec<&str> = buffer.split_whitespace().collect();
+
+        let (command, args) = line.split_first().unwrap();
+
+        match *command {
+            ".help" | ".h" =>
+                println!("{}", *HELP_MESSAGE),
+
+            ".emit" | ".e" => {
+                if args.is_empty(){
+                    println!(
+                        "Please use one of the following options: {}", 
+                        BOLD.paint("tokens ast clif asm")
+                    );
+                    return
+                }
+
+                let mut config = &mut self.config.debug_config;
+
+                if args.contains(&"tokens"){
+                    config.emit_tokens = !config.emit_tokens;
+                    println!("Emiting Tokens: {}", BOLD.paint(config.emit_tokens))
+                }
+
+                if args.contains(&"ast"){
+                    config.emit_ast = !config.emit_ast;
+                    println!("Emiting AST: {}", BOLD.paint(config.emit_ast))
+                }
+
+                if args.contains(&"clif"){
+                    config.emit_clif = !config.emit_clif;
+                    println!("Emiting CLIF: {}", BOLD.paint(config.emit_clif))
+                }
+
+                if args.contains(&"asm"){
+                    config.emit_asm = !config.emit_asm;
+                    println!("Emiting ASM: {}", BOLD.paint(config.emit_asm))
+                }
+            },
+
+            ".silent" | ".s" => {
+                self.silent = !self.silent;
+                println!("Stack printing: {}", BOLD.paint(!self.silent))
+            },
+
+            ".inspect" | ".i" => {
+                todo!()
+            },
+
+            _ => todo!()
+        }
+    }
+
+    fn default_prompt() -> Box<dyn Prompt> {
+        Box::new(DefaultPrompt::new(
+            DefaultPromptSegment::Basic("ez".to_string()),
+            DefaultPromptSegment::CurrentDateTime
+        ))
     }
 }

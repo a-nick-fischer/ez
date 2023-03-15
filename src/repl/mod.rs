@@ -1,4 +1,5 @@
 mod hinter;
+mod symbols;
 
 use std::sync::{Mutex, Arc};
 
@@ -7,7 +8,7 @@ use yansi::{Color, Style};
 
 use crate::{codegen::jit::Jit, config::Config};
 
-use self::hinter::{AutocompletionHinter, Symbols};
+use self::{hinter::AutocompletionHinter, symbols::Symbols};
 
 lazy_static! {
     static ref BOLD: Style = Style::new(Color::Fixed(7)).bold();

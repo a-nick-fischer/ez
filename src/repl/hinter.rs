@@ -1,44 +1,13 @@
-use std::{sync::{Arc, Mutex}, fmt::Display};
+use std::{sync::{Arc, Mutex}};
 
 use reedline::{History, Hinter};
-use weighted_trie::WeightedTrie;
+
 use yansi::{Style, Color};
 
-const MIN_CHARS: usize = 2;
+use super::symbols::Symbols;
 
 lazy_static! {
     static ref HINTER_STYLE: Style = Style::new(Color::Fixed(7)).dimmed();
-}
-
-pub struct Symbols(WeightedTrie);
-
-impl Symbols {
-    pub fn new<'a>(new_symbols: impl Iterator<Item = &'a String>) -> Self {
-        let mut trie = WeightedTrie::new();
-        
-        for symbol in new_symbols {
-            trie.insert(symbol.clone(), 1);
-        }
-
-        Symbols(trie)
-    }
-
-    fn search(&self, prefix: &str) -> Vec<String> {
-        self.0.search(prefix)
-    }
-}
-
-impl Display for Symbols {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let symbols: Vec<String> = self.0.search("");
-
-        let content = symbols.chunks(5)
-            .map(|chunk| chunk.join("   "))
-            .collect::<Vec<String>>()
-            .join("\n");
-
-        write!(f, "{}", content)
-    }
 }
 
 pub struct AutocompletionHinter {
@@ -63,19 +32,21 @@ impl Hinter for AutocompletionHinter {
         _history: &dyn History,
         use_ansi_coloring: bool,
     ) -> String {
-        self.current_hint = if line.len() >= MIN_CHARS {
+        let last_word = line.split_whitespace().last();
+
+        self.current_hint = if let Some(word) = last_word {
             self.symbols
                 .lock()
                 .unwrap()
-                .search(line)
-                .get(0)
-                .map(|completion| 
+                .search(word)
+                .first()
+                .map(|completion|
                     completion.chars()
-                        .skip(completion.len() - line.len())
+                        .skip(word.len())
                         .collect()
                 )
                 .unwrap_or_default()
-        } 
+        }
         else {
             String::new()
         };

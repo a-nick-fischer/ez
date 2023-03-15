@@ -1,14 +1,15 @@
 mod hinter;
 mod symbols;
+mod completer;
 
 use std::sync::{Mutex, Arc};
 
-use reedline::{DefaultPrompt, Reedline, Signal, Prompt, DefaultPromptSegment};
+use reedline::{DefaultPrompt, Reedline, Signal, Prompt, DefaultPromptSegment, DefaultValidator, Keybindings, KeyModifiers, ReedlineEvent, KeyCode, default_emacs_keybindings, Emacs, ColumnarMenu, ReedlineMenu};
 use yansi::{Color, Style};
 
 use crate::{codegen::jit::Jit, config::Config};
 
-use self::{hinter::AutocompletionHinter, symbols::Symbols};
+use self::{hinter::EzHinter, symbols::Symbols, completer::EzCompleter};
 
 lazy_static! {
     static ref BOLD: Style = Style::new(Color::Fixed(7)).bold();
@@ -53,7 +54,7 @@ lazy_static! {
           - Type {} or {} to toggle the {} options, for debugging mainly
           - Type {} or {} to display this message (amazing, right?)
 
-        To see a list of all available press {}
+        To see a list of autocompletion-options, press {}
 
         "#,
         style.paint(".i"), style.paint(".inspect"),
@@ -79,11 +80,21 @@ impl Repl {
         let jit = Jit::new();
 
         let symbols = Symbols::new(jit.defined_symbols());
-
         let current_symbols = Arc::new(Mutex::new(symbols));
-        let hinter = Box::new(AutocompletionHinter::new(current_symbols.clone()));
 
-        let line_editor = Reedline::create().with_hinter(hinter);
+        let hinter = EzHinter::new(current_symbols.clone());
+        let completer = EzCompleter::new(current_symbols.clone());
+        let validator = DefaultValidator {};
+        let edit_mode = Emacs::new(Self::default_keybindings());
+
+        let completion_menu = ColumnarMenu::default().with_name("completion_menu");
+
+        let line_editor = Reedline::create()
+            .with_hinter(Box::new(hinter))
+            .with_completer(Box::new(completer))
+            .with_validator(Box::new(validator))
+            .with_edit_mode(Box::new(edit_mode))
+            .with_menu(ReedlineMenu::EngineCompleter(Box::new(completion_menu)));
 
         let prompt = Self::default_prompt();
 
@@ -199,5 +210,20 @@ impl Repl {
             DefaultPromptSegment::Basic("ez".to_string()),
             DefaultPromptSegment::CurrentDateTime
         ))
+    }
+
+    fn default_keybindings() -> Keybindings {
+        let mut keybindings = default_emacs_keybindings();
+
+        keybindings.add_binding(
+            KeyModifiers::NONE,
+            KeyCode::Tab,
+            ReedlineEvent::UntilFound(vec![
+                ReedlineEvent::Menu("completion_menu".to_string()),
+                ReedlineEvent::MenuNext,
+            ]),
+        );
+
+        keybindings
     }
 }

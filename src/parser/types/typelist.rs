@@ -74,6 +74,10 @@ impl From<Vec<Type>> for TypeList {
 
 impl Display for TypeList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.vec().is_empty(){
+            return write!(f, "<nothing>");
+        }
+
         let msg = self.vec()
             .iter()
             .map(|t| t.to_string())

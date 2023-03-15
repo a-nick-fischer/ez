@@ -10,12 +10,12 @@ lazy_static! {
     static ref HINTER_STYLE: Style = Style::new(Color::Fixed(7)).dimmed();
 }
 
-pub struct AutocompletionHinter {
+pub struct EzHinter {
     current_hint: String,
     symbols: Arc<Mutex<Symbols>>
 }
 
-impl AutocompletionHinter {
+impl EzHinter {
     pub fn new(symbols: Arc<Mutex<Symbols>>) -> Self {
         Self {
             current_hint: String::new(),
@@ -24,7 +24,7 @@ impl AutocompletionHinter {
     }
 }
 
-impl Hinter for AutocompletionHinter {
+impl Hinter for EzHinter {
     fn handle(
         &mut self,
         line: &str,

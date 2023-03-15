@@ -15,5 +15,5 @@ impl Symbols {
 
     pub fn search(&self, prefix: &str) -> Vec<String> {
         self.0.search(prefix)
-    }
+    } 
 }

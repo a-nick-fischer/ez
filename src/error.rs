@@ -141,12 +141,12 @@ impl Error {
     }
 }
 
-fn message_error_report(msg: String) -> ReportBuilder<Range<usize>> {
+fn message_error_report<'a>(msg: String) -> ReportBuilder<'a, Range<usize>> {
     Report::build(ReportKind::Error, (), 0)
         .with_message(msg)
 }
 
-fn simple_error_report(range: Range<usize>, msg: String, label: String) -> ReportBuilder<Range<usize>> {
+fn simple_error_report<'a>(range: Range<usize>, msg: String, label: String) -> ReportBuilder<'a, Range<usize>> {
     Report::build(ReportKind::Error, (), range.start)
         .with_message(msg)
         .with_label(
@@ -156,7 +156,7 @@ fn simple_error_report(range: Range<usize>, msg: String, label: String) -> Repor
         )
 }
 
-fn add_stack_comparison(builder: ReportBuilder<Range<usize>>, expected: &TypeList, got: &TypeList) -> ReportBuilder<Range<usize>> {
+fn add_stack_comparison<'a>(builder: ReportBuilder<'a, Range<usize>>, expected: &TypeList, got: &TypeList) -> ReportBuilder<'a, Range<usize>> {
     builder
         .with_note(
             format!(

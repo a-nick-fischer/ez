@@ -23,7 +23,7 @@ pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
     recursive::<char, Token, _, _, Simple<char>>(|rec| {
         let number = just('-')
             .or_not()
-            .chain(text::int(10))
+            .chain::<char, _, _>(text::int(10))
             .chain::<char, _, _>(just('.').chain(text::digits(10)).or_not().flatten())
             .collect::<String>()
             .labelled("number")
@@ -99,8 +99,7 @@ pub fn lexer() -> impl Parser<char, Vec<Token>, Error = Simple<char>> {
             .or(newline)
     })
     .padded_by(pad)
+    .recover_with(skip_then_retry_until([' ']).consume_end())
     .repeated()
     .then_ignore(end())
-    //.recover_with(nested_delimiters('[', ']', [], |_| vec![Token::Invalid]))
-    .recover_with(skip_then_retry_until([']', '"']))
 }

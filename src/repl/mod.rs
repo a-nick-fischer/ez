@@ -10,7 +10,7 @@ use yansi::{Color, Style};
 
 use crate::{codegen::jit::Jit, config::Config};
 
-use self::{hinter::EzHinter, symbols::Symbols, completer::EzCompleter};
+use self::{hinter::EzHinter, symbols::Symbols, completer::EzCompleter, highlighter::EzHighlighter};
 
 lazy_static! {
     static ref BOLD: Style = Style::new(Color::Fixed(7)).bold();
@@ -86,6 +86,7 @@ impl Repl {
 
         let hinter = EzHinter::new(current_symbols.clone());
         let completer = EzCompleter::new(current_symbols.clone());
+        let highlighter = EzHighlighter {};
         let validator = DefaultValidator {};
         let edit_mode = Emacs::new(Self::default_keybindings());
 
@@ -94,6 +95,7 @@ impl Repl {
         let line_editor = Reedline::create()
             .with_hinter(Box::new(hinter))
             .with_completer(Box::new(completer))
+            .with_highlighter(Box::new(highlighter))
             .with_validator(Box::new(validator))
             .with_edit_mode(Box::new(edit_mode))
             .with_menu(ReedlineMenu::EngineCompleter(Box::new(completion_menu)));

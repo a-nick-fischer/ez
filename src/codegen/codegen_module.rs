@@ -1,5 +1,5 @@
 use cranelift::prelude::*;
-use cranelift_module::{Module, DataContext, DataId, FuncId, FuncOrDataId};
+use cranelift_module::{Module, DataContext, DataId, FuncId, FuncOrDataId, FunctionDeclaration};
 
 use crate::error::{Error, error};
 use crate::parser::signature_parser::TypedSignature;
@@ -58,6 +58,10 @@ impl<M: Module> CodeGenModule<M> {
 
             _ => Err(error(format!("{name} not a function - yes this is a compiler bug"))),
         }
+    }
+
+    pub fn get_func_decl(&self, id: FuncId) -> &FunctionDeclaration {
+        self.module.declarations().get_function_decl(id)
     }
 
     pub fn build_cranelift_signature(&self, sig: &TypedSignature) -> Result<Signature, Error> {

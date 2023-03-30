@@ -2,6 +2,8 @@ use crate::{error::Error, lexer::token::Token};
 
 use super::{type_env::TypeEnv, typelist::TypeList, types::typ::Type, signature_parser::TypedSignature};
 
+pub type FuncID = u32;
+
 #[derive(Clone, Debug)]
 pub enum Node {
     Assigment {
@@ -19,6 +21,7 @@ pub enum Node {
     },
 
     Call {
+        id: FuncID,
         name: String,
         token: Token,
         arguments: TypeList,
@@ -42,7 +45,7 @@ pub enum Literal {
 
     List(Vec<Node>),
 
-    Function(TypedSignature, Vec<Node>)
+    Function(FuncID, TypedSignature, Vec<Node>)
 }
 
 impl Node {
@@ -69,7 +72,11 @@ impl Node {
 
     pub fn apply(&self, env: &mut TypeEnv) -> Result<(), Error> {
         match self {
-            Node::Assigment { name, typ, .. } => {
+            Node::Assigment { name, typ, token, .. } => {
+                if env.bindings.contains_key(name){
+                    return Err(Error::Reassigment { token: token.clone() });
+                }
+
                 env.bindings.insert(name.clone(), typ.clone());
                 Ok(())
             },
@@ -121,6 +128,7 @@ impl Node {
 
     pub fn new_marker_call(name: &str) -> Node {
         Node::Call { 
+            id: 0,
             name: name.to_string(), 
             token: Token::Newline, // TODO It does not matter, but this is hacky anyways
             arguments: TypeList::new(),

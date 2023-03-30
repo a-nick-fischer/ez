@@ -15,5 +15,9 @@ impl Symbols {
 
     pub fn search(&self, prefix: &str) -> Vec<String> {
         self.0.search(prefix)
-    } 
+    }
+
+    pub fn contains(&self, str: &str) -> bool {
+        self.search(str).contains(&str.to_owned()) // TODO Rewrite this mess
+    }
 }

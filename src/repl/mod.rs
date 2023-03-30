@@ -86,7 +86,7 @@ impl Repl {
 
         let hinter = EzHinter::new(current_symbols.clone());
         let completer = EzCompleter::new(current_symbols.clone());
-        let highlighter = EzHighlighter {};
+        let highlighter = EzHighlighter::new(current_symbols.clone());
         let validator = DefaultValidator {};
         let edit_mode = Emacs::new(Self::default_keybindings());
 

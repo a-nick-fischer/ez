@@ -1,7 +1,7 @@
 pub mod signature_parser;
 pub mod node;
 pub mod types;
-//pub mod ast;
+pub mod ast;
 
 use crate::{lexer::token::Token, error::Error};
 
@@ -36,7 +36,7 @@ pub fn parse(mut tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>
                     typ: quote_type(), 
                     token: token.clone(),
                     value: Literal::Quote(value),
-                    stack_size:  type_env.stack.len()
+                    stack_size: type_env.stack.len()
                 },
                 type_env,
                 &mut typed_stack
@@ -47,7 +47,8 @@ pub fn parse(mut tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>
                     .ok_or_else(|| Error::VariableNotFound { token: token.clone() })?;
 
                 let node = if let Some((args, ret)) = typ.extract_function() {
-                    Node::Call { 
+                    Node::Call {
+                        id: 0,
                         name: value.clone(), 
                         token: token.clone(),
                         arguments: args,
@@ -146,7 +147,7 @@ pub fn parse(mut tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>
 
                 let node = Node::Literal { 
                     typ: sig.clone().into(),
-                    value: Literal::Function(sig, ast),
+                    value: Literal::Function(0, sig, ast),
                     token: token.clone(), 
                     stack_size: type_env.stack.len()
                 };

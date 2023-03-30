@@ -28,6 +28,10 @@ pub enum Error {
         token: Token
     },
 
+    Reassigment {
+        token: Token
+    },
+
     WrongTypeInList {
         token: Token,
         expected: Type,
@@ -70,7 +74,9 @@ impl Error {
 
             Error::General { message } => print(message_error_report(message.clone())),
 
-            Error::VariableNotFound { token: Token::Ident { value, range } } => print(simple_error_report(
+            Error::VariableNotFound { token: Token::Ident { value, range } } | 
+            Error::VariableNotFound { token: Token::GetIdent { value, range } } 
+            => print(simple_error_report(
                 range.clone(), 
                 format!(
                     "The variable {} is not defined at this point",
@@ -79,7 +85,7 @@ impl Error {
                 "this one".to_string()
             )),
 
-            Error::AssigmentEmptyStack { token: Token::Ident { value, range } } => print(simple_error_report(
+            Error::AssigmentEmptyStack { token: Token::Assigment { value, range } } => print(simple_error_report(
                 range.clone(), 
                 format!(
                     "Cannot assign to {}, as the stack is empty at this point",
@@ -88,10 +94,10 @@ impl Error {
                 "this one".to_string()
             )),
 
-            Error::AssigmentEmptyStack { token: Token::GetIdent { value, range } } => print(simple_error_report(
+            Error::Reassigment { token: Token::Assigment { value, range } } => print(simple_error_report(
                 range.clone(), 
                 format!(
-                    "Cannot assign to {}, as the stack is empty at this point",
+                    "Cannot assign to {}, as it already assigned a value at this point",
                     value.fg(Color::Cyan)
                 ),
                 "this one".to_string()

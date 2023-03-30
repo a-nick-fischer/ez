@@ -1,35 +1,47 @@
 use std::collections::{HashMap, HashSet};
 
-use super::{node::Node, types::types::Type};
+use super::{node::{Node, FuncID}, types::{type_env::TypeEnv}, signature_parser::TypedSignature};
 
-pub type FuncInstances = HashSet<HashMap<String, Type>>;
+pub const MAIN_FUNC_ID: FuncID = 0;
+pub const INLINE_THRESHOLD: usize = 10; 
 
 pub struct FuncInfo {
-    pub instances: FuncInstances,
+    pub instances: HashSet<TypedSignature>,
     pub captured_vars: HashSet<String>,
-    pub closures: HashMap<String, FuncInfo>,
-    pub inline_candidate: bool
+    pub nodes: Vec<Node>
 }
 
-pub struct Ast {
-    pub nodes: Vec<Node>,
-    pub captured_vars: HashSet<String>,
-    pub func_info: HashMap<String, FuncInfo>
-}
-
-impl Ast {
-    pub fn new(nodes: Vec<Node>) -> Self {
-        Self {
-            nodes,
-
-        }
+impl FuncInfo {
+    fn should_inline(&self) -> bool {
+        self.nodes.len() <= INLINE_THRESHOLD
     }
 }
 
-fn analyze_instances(nodes: &Vec<Node>) -> FuncInstances {
+pub struct Ast {
+    funcs: HashMap<FuncID, FuncInfo>
+}
 
+impl Ast {
+    pub fn new() -> Self {
+        Self {
+            funcs: HashMap::new()
+        }
+    }
+
+    pub fn main(&self) -> &FuncInfo {
+        self.func(MAIN_FUNC_ID)
+    }
+
+    pub fn func(&self, id: FuncID) -> &FuncInfo {
+        self.funcs.get(&id)
+            .unwrap_or_else(|| panic!("Expect function with id {id} to be defined"))
+    }
+}
+
+fn analyze_instances(nodes: &Vec<Node>) -> HashSet<TypedSignature> {
+    todo!()
 }
 
 fn vars_captured_in_closures(nodes: &Vec<Node>) -> HashSet<String> {
-
+    todo!()
 }

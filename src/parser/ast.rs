@@ -5,9 +5,10 @@ use super::{node::{Node, FuncID}, types::{type_env::TypeEnv}, signature_parser::
 pub const MAIN_FUNC_ID: FuncID = 0;
 pub const INLINE_THRESHOLD: usize = 10; 
 
+#[derive(Default)]
 pub struct FuncInfo {
     pub instances: HashSet<TypedSignature>,
-    pub captured_vars: HashSet<String>,
+    pub captures_vars: HashSet<String>,
     pub nodes: Vec<Node>
 }
 
@@ -17,15 +18,38 @@ impl FuncInfo {
     }
 }
 
+pub struct AstBuilder {
+    funcs: Vec<FuncInfo>
+}
+
+impl AstBuilder {
+    pub fn new() -> Self {
+        Self {
+            funcs: Vec::new()
+        }
+    }
+
+    pub fn add_func(&mut self, nodes: Vec<Node>) -> FuncID {
+        self.funcs.push(FuncInfo {
+            nodes,
+            ..Default::default()
+        });
+
+        self.funcs.len() - 1
+    }
+
+    pub fn finish(self) -> Ast {
+        Ast { funcs: self.funcs }
+    }
+}
+
 pub struct Ast {
-    funcs: HashMap<FuncID, FuncInfo>
+    funcs: Vec<FuncInfo>
 }
 
 impl Ast {
-    pub fn new() -> Self {
-        Self {
-            funcs: HashMap::new()
-        }
+    pub fn builder(self) -> AstBuilder {
+        AstBuilder { funcs: self.funcs }
     }
 
     pub fn main(&self) -> &FuncInfo {
@@ -33,15 +57,7 @@ impl Ast {
     }
 
     pub fn func(&self, id: FuncID) -> &FuncInfo {
-        self.funcs.get(&id)
+        self.funcs.get(id)
             .unwrap_or_else(|| panic!("Expect function with id {id} to be defined"))
     }
-}
-
-fn analyze_instances(nodes: &Vec<Node>) -> HashSet<TypedSignature> {
-    todo!()
-}
-
-fn vars_captured_in_closures(nodes: &Vec<Node>) -> HashSet<String> {
-    todo!()
 }

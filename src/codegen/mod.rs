@@ -32,13 +32,13 @@ fn native_isa() -> Arc<dyn TargetIsa> {
         Ok(builder) => {
             // See https://github.com/bytecodealliance/wasmtime/blob/e4dc9c79443259e40f3e93b9c7815b0645ebd5c4/cranelift/jit/src/backend.rs#L50
             let mut flag_builder = settings::builder();
-            /*flag_builder.set("use_colocated_libcalls", "false").unwrap();
+            flag_builder.set("use_colocated_libcalls", "false").unwrap();
             flag_builder.set("is_pic", "true").unwrap();
             flag_builder.set("opt_level", "speed").unwrap();
             flag_builder.set("regalloc_checker", "true").unwrap();
             flag_builder.set("enable_alias_analysis", "true").unwrap();
             flag_builder.set("enable_verifier", "true").unwrap();
-            flag_builder.set("enable_probestack", "false").unwrap();*/
+            flag_builder.set("enable_probestack", "false").unwrap();
             //flag_builder.set("use_egraphs", "true").unwrap();
 
             let flags = Flags::new(flag_builder);

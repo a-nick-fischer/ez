@@ -2,7 +2,7 @@ use crate::{error::Error, lexer::token::Token};
 
 use super::{type_env::TypeEnv, typelist::TypeList, types::typ::Type, signature_parser::TypedSignature};
 
-pub type FuncID = u32;
+pub type FuncID = usize;
 
 #[derive(Clone, Debug)]
 pub enum Node {

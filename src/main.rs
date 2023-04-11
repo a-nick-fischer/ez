@@ -12,6 +12,7 @@ mod codegen;
 mod config;
 mod debug_printer;
 mod stdlib;
+mod code_graph;
 
 #[macro_use]
 extern crate lazy_static;

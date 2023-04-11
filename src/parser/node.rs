@@ -2,38 +2,44 @@ use crate::{error::Error, lexer::token::Token};
 
 use super::{type_env::TypeEnv, typelist::TypeList, types::typ::Type, signature_parser::TypedSignature};
 
-pub type FuncID = usize;
+#[derive(Clone, Debug)]
+pub struct FunctionDefinition {
+    sig: TypedSignature, 
+    body: Vec<Node>
+}
 
 #[derive(Clone, Debug)]
 pub enum Node {
+    FunctionDefinition {
+        name: String,
+        assigment_token: Token,
+        function_token: Token,
+        definition: FunctionDefinition
+    },
+
     Assigment {
         name: String,
         token: Token,
-        typ: Type,
-        stack_size: usize
+        typ: Type
     },
 
     Variable {
         name: String,
         token: Token,
-        typ: Type,
-        stack_size: usize
+        typ: Type
     },
 
     Call {
-        id: FuncID,
         name: String,
         token: Token,
         arguments: TypeList,
-        returns: TypeList,
-        stack_size: usize
+        returns: TypeList
     },
 
     Literal {
         typ: Type,
         value: Literal,
-        token: Token,
-        stack_size: usize
+        token: Token
     }
 }
 
@@ -45,33 +51,21 @@ pub enum Literal {
 
     List(Vec<Node>),
 
-    Function(FuncID, TypedSignature, Vec<Node>)
+    Function(FunctionDefinition)
 }
 
 impl Node {
-    /*pub fn stack_size_before(&self) -> usize {
-        match self {
-            Node::Assigment { stack_size, .. } |
-            Node::Variable { stack_size, .. } |
-            Node::Call { stack_size, .. } |
-            Node::Literal { stack_size, .. } => *stack_size,
-        }
-    }
-
-    pub fn stack_size_after(&self) -> usize {
-        match self {
-            Node::Assigment { stack_size, .. } => stack_size - 1,
-
-            Node::Variable { stack_size, .. } => stack_size + 1,
-            
-            Node::Call { stack_size, arguments, returns, .. } => stack_size + arguments.len() - returns.len(),
-            
-            Node::Literal { stack_size, .. } => stack_size + 1,
-        }
-    }*/
-
     pub fn apply(&self, env: &mut TypeEnv) -> Result<(), Error> {
         match self {
+            Node::FunctionDefinition { name, assigment_token, definition, .. } => {
+                if env.bindings.contains_key(name){
+                    return Err(Error::Reassigment { token: assigment_token.clone() });
+                }
+
+                env.bindings.insert(name.clone(), definition.sig.into() );
+                Ok(())
+            },
+
             Node::Assigment { name, typ, token, .. } => {
                 if env.bindings.contains_key(name){
                     return Err(Error::Reassigment { token: token.clone() });
@@ -127,13 +121,11 @@ impl Node {
     }
 
     pub fn new_marker_call(name: &str) -> Node {
-        Node::Call { 
-            id: 0,
+        Node::Call {
             name: name.to_string(), 
             token: Token::Newline, // TODO It does not matter, but this is hacky anyways
             arguments: TypeList::new(),
-            returns: TypeList::new(), 
-            stack_size: 0
+            returns: TypeList::new()
         }
     }
 }

@@ -1,113 +1,83 @@
 pub mod signature_parser;
 pub mod node;
 pub mod types;
-pub mod ast;
 
 use crate::{lexer::token::Token, error::Error};
 
-use self::{node::{Node, Literal}, types::{*, type_env::TypeEnv, typelist::TypeList, typ::Type}, signature_parser::TypedSignature};
+use self::{node::{Node, Literal, FunctionDefinition}, types::{*, type_env::TypeEnv, typelist::TypeList, typ::Type}, signature_parser::TypedSignature};
 
 pub fn parse(mut tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>, Error> {
     let mut typed_stack = Vec::new();
-
-    let apply = |node: Node, type_env: &mut TypeEnv, typed_stack: &mut Vec<Node>| -> Result<(), Error> {
-        node.apply(type_env)?;
-        typed_stack.push(node);
-        Ok(())
-    };
     
     while !tokens.is_empty() {
         let token = &tokens.pop().unwrap();
 
-        match token.clone() {
-            Token::Number { value, .. } => apply(
+        let node = match token.clone() {
+            Token::Number { value, .. } =>
                 Node::Literal { 
                     typ: number_type(), 
                     token: token.clone(), 
-                    value: Literal::Number(value),
-                    stack_size:  type_env.stack.len()
+                    value: Literal::Number(value)
                 },
-                type_env,
-                &mut typed_stack
-            )?,
             
-            Token::Quote { value, .. } => apply(
+            Token::Quote { value, .. } =>
                 Node::Literal { 
                     typ: quote_type(), 
                     token: token.clone(),
-                    value: Literal::Quote(value),
-                    stack_size: type_env.stack.len()
+                    value: Literal::Quote(value)
                 },
-                type_env,
-                &mut typed_stack
-            )?,
             
             Token::Ident { ref value, .. } => {
                 let typ = type_env.bindings.get(value)
                     .ok_or_else(|| Error::VariableNotFound { token: token.clone() })?;
 
-                let node = if let Some((args, ret)) = typ.extract_function() {
+                if let Some((args, ret)) = typ.extract_function() {
                     Node::Call {
-                        id: 0,
                         name: value.clone(), 
                         token: token.clone(),
                         arguments: args,
-                        returns: ret,
-                        stack_size: type_env.stack.len()
+                        returns: ret
                     }
                 }
                 else {
                     Node::Variable { 
                         name: value.clone(), 
                         token: token.clone(), 
-                        typ: typ.clone(),
-                        stack_size: type_env.stack.len()
+                        typ: typ.clone()
                     }
-                };
-
-                apply(node, type_env, &mut typed_stack)?;
+                }
             },
             
             Token::GetIdent { ref value, .. } => {
                 let typ = type_env.bindings.get(value)
                     .ok_or_else(|| Error::VariableNotFound { token: token.clone() })?;
 
-                let node = Node::Variable { 
+                Node::Variable { 
                     name: value.clone(), 
                     token: token.clone(), 
-                    typ: typ.clone(),
-                    stack_size:  type_env.stack.len()
-                };
-
-                apply(node, type_env, &mut typed_stack)?;
+                    typ: typ.clone()
+                }
             },
 
             Token::Assigment { ref value, .. } => {
                 if let Some(val) = type_env.stack.pop() {
-                    let node = Node::Assigment { 
+                    Node::Assigment { 
                         name: value.clone(), 
-                        token: token.clone(), 
-                        typ: val,
-                        stack_size:  type_env.stack.len()
-                    };
-
-                    apply(node, type_env, &mut typed_stack)?;
+                        token: token.clone(),
+                        typ: val
+                    }
                 }
                 else {
                     return Err(Error::AssigmentEmptyStack { token: token.clone() })
                 }
             },
 
-            Token::List { ref value, .. } if value.is_empty() => apply(
+            Token::List { ref value, .. } if value.is_empty() =>
                 Node::Literal { 
                     typ: var_type("a", None),
                     value: Literal::List(Vec::new()),
-                    token: token.clone(),
-                    stack_size: type_env.stack.len()
+                    token: token.clone()
                 },
-                type_env,
-                &mut typed_stack
-            )?,
 
             Token::List { ref value, .. } => {
                 let mut new_env = type_env.clone();
@@ -116,16 +86,12 @@ pub fn parse(mut tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>
                 let ast = parse(value.clone(), &mut new_env)?;
                 
                 match typecheck_list(&new_env.stack) {
-                    Ok(typ) => apply(
+                    Ok(typ) => 
                         Node::Literal { 
                             typ: list_type(typ), 
                             token: token.clone(),
-                            value: Literal::List(ast),
-                            stack_size: type_env.stack.len()
+                            value: Literal::List(ast)
                         },
-                        type_env,
-                        &mut typed_stack
-                    )?,
 
                     Err((expected, got)) => {
                         return Err(Error::WrongTypeInList { token: token.clone(), expected, got });
@@ -145,18 +111,35 @@ pub fn parse(mut tokens: Vec<Token>, type_env: &mut TypeEnv) -> Result<Vec<Node>
                 // Typecheck return
                 typecheck_func_return(token, sig.returns().clone(), &mut new_env)?;
 
-                let node = Node::Literal { 
-                    typ: sig.clone().into(),
-                    value: Literal::Function(0, sig, ast),
-                    token: token.clone(), 
-                    stack_size: type_env.stack.len()
-                };
-                
-                apply(node, type_env, &mut typed_stack)?;
+                let definition = FunctionDefinition { sig, body: ast };
+
+                let next_token = tokens.first().cloned();
+                match next_token {
+                    Some(Token::Assigment { ref value, .. }) => {
+                        tokens.pop();
+
+                        Node::FunctionDefinition { 
+                            name: value.clone(), 
+                            assigment_token: next_token.unwrap(),
+                            function_token: token.clone(),
+                            definition
+                        }
+                    },
+
+                    _ => 
+                        Node::Literal { 
+                            typ: sig.clone().into(),
+                            value: Literal::Function(definition),
+                            token: token.clone()
+                        },
+                }
             },
 
             Token::Newline => unreachable!(),
-        }
+        };
+
+        node.apply(type_env)?;
+        typed_stack.push(node);
     }
 
     Ok(typed_stack)

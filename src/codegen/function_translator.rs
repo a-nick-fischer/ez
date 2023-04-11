@@ -267,7 +267,7 @@ impl<'a, M: Module> FunctionTranslator<'a, M> {
                     Ok(address)
                 },
     
-                (types::FUNC_TYPE_NAME, Literal::Function(_, sig, ast)) => {
+                (types::FUNC_TYPE_NAME, Literal::Function(sig, ast)) => {
                     let (id, _) = FunctionTranslator::new(self.codegen)
                         .with_signature(sig)
                         .with_body(ast)?

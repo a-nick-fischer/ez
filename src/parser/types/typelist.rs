@@ -38,6 +38,10 @@ impl TypeList {
         self.0.is_empty()
     }
 
+    pub fn clone_top(&self, n: usize) -> Vec<Type> {
+        self.0[(self.len() - n)..].to_owned()
+    }
+
     pub fn clear_vars(&self) { 
         self.0.iter().for_each(|typ| typ.clear_vars())
     }

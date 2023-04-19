@@ -3,20 +3,7 @@ use crate::{error::Error, lexer::token::Token};
 use super::{type_env::TypeEnv, typelist::TypeList, types::typ::Type, signature_parser::TypedSignature};
 
 #[derive(Clone, Debug)]
-pub struct FunctionDefinition {
-    sig: TypedSignature, 
-    body: Vec<Node>
-}
-
-#[derive(Clone, Debug)]
 pub enum Node {
-    FunctionDefinition {
-        name: String,
-        assigment_token: Token,
-        function_token: Token,
-        definition: FunctionDefinition
-    },
-
     Assigment {
         name: String,
         token: Token,
@@ -51,21 +38,12 @@ pub enum Literal {
 
     List(Vec<Node>),
 
-    Function(FunctionDefinition)
+    Function(TypedSignature, Vec<Node>)
 }
 
 impl Node {
     pub fn apply(&self, env: &mut TypeEnv) -> Result<(), Error> {
         match self {
-            Node::FunctionDefinition { name, assigment_token, definition, .. } => {
-                if env.bindings.contains_key(name){
-                    return Err(Error::Reassigment { token: assigment_token.clone() });
-                }
-
-                env.bindings.insert(name.clone(), definition.sig.into() );
-                Ok(())
-            },
-
             Node::Assigment { name, typ, token, .. } => {
                 if env.bindings.contains_key(name){
                     return Err(Error::Reassigment { token: token.clone() });

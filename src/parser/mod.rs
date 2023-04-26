@@ -162,7 +162,6 @@ fn typecheck_func_return(token: &Token, results: TypeList, new_env: &mut TypeEnv
             .map_err(|msg| Error::UnificationError { token: token.clone(), msg })?;
     }
 
-    // TODO Why is this necessary?
     if results.has_bound_vars() || env_clone.stack.has_bound_vars() {
         return Err(Error::IncompatibleFunctionReturn { token: token.clone(), expected: results, got: new_env.clone().stack });
     }

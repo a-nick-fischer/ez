@@ -62,15 +62,6 @@ impl<M: Module> CodeGenModule<M> {
         }
     }
 
-    pub fn get_func_decl(&self, id: FuncId) -> &FunctionDeclaration {
-        self.module.declarations().get_function_decl(id)
-    }
-
-    // This isn't proper namespace-based mangling, but meh... good enough for now
-    pub fn mangle_name(&self, name: &str) -> String {
-        format!("{MANGLE_PREFIX}{name}")
-    }
-
     pub fn build_cranelift_signature(&self, sig: &TypedSignature) -> Result<Signature, Error> {
         let mut cranelift_cig = self.module.make_signature();
     

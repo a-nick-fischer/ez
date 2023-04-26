@@ -14,10 +14,13 @@ pub struct TypeEnv {
 impl TypeEnv {
     pub fn new(bindings: &TypeBindings) -> Self {
         Self {
-            var_counter: 0,
-            stack: TypeList::new(),
-            bindings: bindings.clone()
+            bindings: bindings.clone(),
+            ..Default::default()
         }
+    }
+
+    pub fn clone_bindings(&self) -> Self {
+        Self::new(&self.bindings)
     }
 
     pub fn new_var(&mut self, name: String, val: Option<Type>) -> Type {

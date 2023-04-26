@@ -1,4 +1,5 @@
 use std::fmt::Display;
+use core::ops::{Deref, DerefMut};
 
 use super::{typ::Type, type_env::TypeEnv};
 
@@ -70,9 +71,33 @@ impl TypeList {
     }
 }
 
+impl IntoIterator for TypeList {
+    type Item = Type;
+
+    type IntoIter = <Vec<Type> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
 impl From<Vec<Type>> for TypeList {
     fn from(value: Vec<Type>) -> Self {
         TypeList(value)
+    }
+}
+
+impl Deref for TypeList {
+    type Target = [Type];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0[..]
+    }
+}
+
+impl DerefMut for TypeList {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0[..]
     }
 }
 
